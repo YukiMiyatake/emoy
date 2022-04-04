@@ -4,10 +4,18 @@ service: EldenTalk
 frameworkVersion: '3'
 
 custom:
-  tableName: 'users-table-${sls:stage}'
+  tableName: 'elden-talk-${sls:stage}'
+  dynamodb:
+    stages:
+      - dev
+    start:
+      inMemory: true
+      migrate: true
 
 provider:
   name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'ap-northeast-1'}
   runtime: nodejs14.x
   iam:
     role:
@@ -21,26 +29,51 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
           Resource:
-            - Fn::GetAtt: [ UsersTable, Arn ]
+            - Fn::GetAtt: [ ConnectionsTable, Arn ]
   environment:
-    USERS_TABLE: ${self:custom.tableName}
+    TABLE_NAME: ${self:custom.tableName}
+#      Ref: ConnectionsTable
+  websocketsApiName: ${self:service}
+  websocketsApiRouteSelectionExpression: $request.body.message
 
 functions:
-  api:
-    handler: handler.handler
+  connect:
+    handler: onconnect/app.handler
     events:
-      - httpApi: '*'
+      - websocket:
+          route: $connect
+  disconnect:
+    handler: ondisconnect/app.handler
+    events:
+      - websocket:
+          route: $disconnect
+  sendmessage:
+    handler: sendmessage/app.handler
+    events:
+      - websocket:
+          route: sendmessage
 
 resources:
   Resources:
-    UsersTable:
+    ConnectionsTable:
       Type: AWS::DynamoDB::Table
       Properties:
+        TableName: ${self:custom.tableName}
         AttributeDefinitions:
-          - AttributeName: userId
+          - AttributeName: connectionId
             AttributeType: S
         KeySchema:
-          - AttributeName: userId
+          - AttributeName: connectionId
             KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-        TableName: ${self:custom.tableName}
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: True
+
+
+plugins:
+#  - serverless-webpack
+  - serverless-dynamodb-local
+  - serverless-offline
+
