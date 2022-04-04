@@ -10,7 +10,7 @@ custom:
       - dev
     start:
       inMemory: true
-      migrate: true
+#      migrate: true
 
 provider:
   name: aws
