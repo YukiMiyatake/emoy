@@ -8,11 +8,13 @@ const { TABLE_NAME } = process.env;
 exports.handler = async (event, context) => {
   let connectionData;
 
+
   try {
     connectionData = await ddb.scan({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' }).promise();
   } catch (e) {
     return { statusCode: 500, body: e.stack };
   }
+  console.log("send  " +  event.requestContext.connectionId)
 
   const apigwManagementApi = new AWS.ApiGatewayManagementApi({
     apiVersion: '2018-11-29',
@@ -23,6 +25,9 @@ exports.handler = async (event, context) => {
 
   const postCalls = connectionData.Items.map(async ({ connectionId }) => {
     try {
+        console.log({ ConnectionId: connectionId, Data: postData });
+
+
       await apigwManagementApi.postToConnection({ ConnectionId: connectionId, Data: postData }).promise();
     } catch (e) {
       if (e.statusCode === 410) {

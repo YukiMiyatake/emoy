@@ -9,7 +9,7 @@ exports.handler = function (event, context, callback) {
       connectionId: { S: event.requestContext.connectionId }
     }
   };
-
+console.log("delete  " + event.requestContext.connectionId)
   DDB.deleteItem(deleteParams, function (err) {
     callback(null, {
       statusCode: err ? 500 : 200,
