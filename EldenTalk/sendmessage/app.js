@@ -15,10 +15,15 @@ exports.handler = async (event, context) => {
     return { statusCode: 500, body: e.stack };
   }
   console.log("send  " +  event.requestContext.connectionId)
+  //AWS.config.update({ region: 'localhost' });
+console.log(event.requestContext.domainName + '/' + event.requestContext.stage)
+var endpoint =  process.env.IS_OFFLINE
+    ? 'http://localhost:3001'
+    : 'https://' + event.requestContext.domainName;
 
   const apigwManagementApi = new AWS.ApiGatewayManagementApi({
     apiVersion: '2018-11-29',
-    endpoint: event.requestContext.domainName + '/' + event.requestContext.stage
+    endpoint: endpoint
   });
 
   const postData = JSON.parse(event.body).data;
@@ -34,6 +39,7 @@ exports.handler = async (event, context) => {
         console.log(`Found stale connection, deleting ${connectionId}`);
         await ddb.delete({ TableName: TABLE_NAME, Key: { connectionId } }).promise();
       } else {
+          console.log(e)
         throw e;
       }
     }

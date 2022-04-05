@@ -77,3 +77,4 @@ plugins:
   - serverless-dynamodb-local
   - serverless-offline
 
+useDotenv: true

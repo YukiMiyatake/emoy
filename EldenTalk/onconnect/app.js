@@ -1,18 +1,17 @@
 var AWS = require("aws-sdk");
 AWS.config.update({ region: process.env.AWS_REGION });
-//AWS.config.update({ region: 'localhost' });
 var DDB = new AWS.DynamoDB({ apiVersion: "2012-10-08" });
 
 /*
 var DDB = process.env.IS_OFFLINE
-? new DynamoDB({
-    region: 'localhost',
+? new AWS.DynamoDB({
+  //  region: 'localhost',
     endpoint: 'http://localhost:8000',
     apiVersion: "2012-10-08",
-    accessKeyId: 'DEFAULT_ACCESS_KEY',  // needed if you don't have aws credentials at all in env
-    secretAccessKey: 'DEFAULT_SECRET' // needed if you don't have aws credentials at all in env
+//    accessKeyId: process.env.AWS_ACCESSKEY_ID,
+  //  secretAccessKey: process.env.AWS_SECRET_ACCESSKEY
   })
-  : new DynamoDB({ apiVersion: "2012-10-08" });
+  : new AWS.DynamoDB({ apiVersion: "2012-10-08" });
 */
 console.log("is offline   " + process.env.IS_OFFLINE)
 
