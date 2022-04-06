@@ -1,6 +1,6 @@
 const AWS = require('aws-sdk');
 
-AWS.config.update({ region: process.env.AWS_REGION });
+//AWS.config.update({ region: process.env.AWS_REGION });
 const ddb = new AWS.DynamoDB.DocumentClient({ apiVersion: '2012-08-10' });
 
 const { TABLE_NAME } = process.env;
@@ -17,9 +17,12 @@ exports.handler = async (event, context) => {
   console.log("send  " +  event.requestContext.connectionId)
   //AWS.config.update({ region: 'localhost' });
 console.log(event.requestContext.domainName + '/' + event.requestContext.stage)
+
+const {connectionId, apiId, stage} = event.requestContext;
+
 var endpoint =  process.env.IS_OFFLINE
     ? 'http://localhost:3001'
-    : 'https://' + event.requestContext.domainName;
+    : `https://${apiId}.execute-api.${process.env.AWS_REGION}.amazonaws.com/${stage}`;
 
   const apigwManagementApi = new AWS.ApiGatewayManagementApi({
     apiVersion: '2018-11-29',
