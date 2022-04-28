@@ -1,4 +1,4 @@
-// デバッグ表示専用のHTTP APIでも作ろうかなあ？というかんじ
+// 使ってない。デバッグ表示専用のHTTP APIでも作ろうかなあ？というかんじ
 
 const AWS = require("aws-sdk");
 const express = require("express");

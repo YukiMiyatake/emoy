@@ -8,8 +8,8 @@ var DDB = process.env.IS_OFFLINE
   //  region: 'localhost',
     endpoint: 'http://localhost:8000',
     apiVersion: "2012-10-08",
-//    accessKeyId: process.env.AWS_ACCESSKEY_ID,
-  //  secretAccessKey: process.env.AWS_SECRET_ACCESSKEY
+//    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  //  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
   })
   : new AWS.DynamoDB({ apiVersion: "2012-10-08" });
 */
