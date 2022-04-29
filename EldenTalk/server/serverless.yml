@@ -6,16 +6,19 @@ frameworkVersion: '3'
 custom:
   tableName: 'elden-talk-${sls:stage}'
   dynamodb:
+    docker: true
     stages:
       - dev
     start:
       inMemory: true
-#      migrate: true
+      migrate: true
 
 provider:
   name: aws
   stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'ap-northeast-1'}
+#  region: ${opt:region, 'ap-northeast-1'}
+#  region: 'localhost'
+  profile: ${env:AWS_PROFILE, 'ap-northeast-1'}
   runtime: nodejs14.x
   iam:
     role:

@@ -11,8 +11,15 @@ services:
     image: eldentalk-server
     working_dir: /app
     volumes:
-      - .:/app
+      - ./server:/app
     container_name: eldentalk-server
+    ports:
+      - 8000:8000
+      - 8001:8001
+      - 3001:3001
+      - 3002:3002
+    environment:
+      AWS_PAGER: ""
     env_file:
       - .env
     logging:
@@ -20,3 +27,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+#networks:
+#  serverless:
+#    external: true

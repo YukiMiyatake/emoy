@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "dependencies": {
+    "dynamodb-admin": "^4.1.0",
     "express": "^4.17.1",
-    "serverless-http": "^2.7.0"
+    "serverless-http": "^2.7.0",
+    "wscat": "^5.1.0"
   },
   "devDependencies": {
     "serverless-dynamodb-local": "^0.2.40",

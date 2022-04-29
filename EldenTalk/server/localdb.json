@@ -1,0 +1,20 @@
+{
+    "AttributeDefinitions": [
+        {
+            "AttributeName": "connectionId",
+            "AttributeType": "S"
+        }
+    ],
+    "TableName": "elden-talk-dev",
+    "KeySchema": [
+        {
+            "AttributeName": "connectionId",
+            "KeyType": "HASH"
+        }
+    ],
+    "ProvisionedThroughput": {
+        "ReadCapacityUnits": 5,
+        "WriteCapacityUnits": 5
+    }
+}
+
