@@ -1,32 +1,66 @@
+# OverView
 今のところWebSocketテストのプロジェクト。
+今後はesports等の補助ツールとかも作りたい
 
-/server
+# EldenTalk
+エルデンリング風のチャットシステムを作りたい
+## /server
 ServerlessFrameworkでAPI Gateway+Websocket+DynamoDBのチャットシステムのサーバ
 
+### 環境構築
+sample.envに正しいAWS Credencialを設定し .envにファイル名変更する
+
+```
+$ cd EldenTalk/server
 $ docker-compose build
 $ docker-compose exec serverless /bin/bash
-でコンソールに入る
-最初に
-$ npm install
-する
 
-$ sls dynamodb start
-Dynamodb-localだけ動かす
+# npm install
+```
 
-$aws dynamodb list-tables --endpoint-url http://localhost:8000
-$aws dynamodb create-table --table-name 'elden-talk-dev' --cli-input-json file://localdb.json --endpoint-url http://localhost:8000
+### サーバにDeploy
+```
+# sls deploy -v
+```
+
+### ローカル実行＆確認
+オフライン実行  エンドポイント ws://localhost:3001
+```
+# sls offline start --host 0.0.0.0
+```
+sls offline だけだとDynamodb等のプラグインが実行されない！
 
 
-$ sls offline
-オフライン実行
-
-$  sls deploy -v
-デプロイ
-
-$ wscat -c ws://...
+wscatで確認(コンテナ内でもホストからでもOK)
+```
+$ wscat -c ws://localhost:3001
 > {"message":"sendmessage", "data":"hello world"}
+```
 
-$sls offline --host 0.0.0.0
-で起動(0.0.0.0 が重要)
+### デバッグ
+#### dynamodb-local単体で動かす
+dynamodb-localの起動。 エンドポイント http://localhost:8000
+```
+# sls dynamodb start
+```
 
+テーブル一覧表示
+```
+$ aws dynamodb list-tables --endpoint-url http://localhost:8000
+```
+
+テーブル作成
+```
+$aws dynamodb create-table --table-name 'elden-talk-dev' --cli-input-json file://localdb.json --endpoint-url http://localhost:8000
+```
+
+データの永続化、SEEDも出来る
+
+
+#### Dynamodb-admin
+dynamodb-localのテーブルをGUI操作出来る
+```
+# npx dynamodb-admin
+```
+デフォルトだと localhost:8000でDynamoに接続し、http://localhost:8001 をブラウザで表示できる
 
