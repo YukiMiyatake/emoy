@@ -64,3 +64,7 @@ dynamodb-localのテーブルをGUI操作出来る
 ```
 デフォルトだと localhost:8000でDynamoに接続し、http://localhost:8001 をブラウザで表示できる
 
+## 残タスク
+TypeScript化
+フロント作成
+ログテーブル

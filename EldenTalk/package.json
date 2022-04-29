@@ -1,5 +1,0 @@
-{
-  "dependencies": {
-    "serverless-dynamodb-local": "^0.2.40"
-  }
-}
