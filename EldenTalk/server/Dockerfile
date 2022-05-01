@@ -33,3 +33,6 @@ RUN apt-get install -y default-jre
 # wscat
 RUN npm install -g wscat
 
+# npm install
+COPY package*.json ./
+RUN npm install

@@ -68,9 +68,10 @@ resources:
         KeySchema:
           - AttributeName: connectionId
             KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
+        BillingMode: PAY_PER_REQUEST
+#        ProvisionedThroughput:
+#          ReadCapacityUnits: 5
+#          WriteCapacityUnits: 5
         SSESpecification:
           SSEEnabled: True
 
