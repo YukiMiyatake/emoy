@@ -8,4 +8,7 @@ services:
     volumes:
       - ./server:/app/server
     working_dir: /app/server
+    ports:
+      - 8080:8080
+
 

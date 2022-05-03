@@ -14,7 +14,10 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
 
 executable hello
-  hs-source-dirs:      src
-  main-is:             Main.hs
-  default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5
+  hs-source-dirs:     src
+  main-is:            Main.hs
+  default-language:   Haskell2010
+  build-depends:      base >= 4.7 && < 5
+                    , http-types
+                    , wai
+                    , warp
