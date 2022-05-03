@@ -46,12 +46,12 @@ dynamodb-localの起動。 エンドポイント http://localhost:8000
 
 テーブル一覧表示
 ```
-$ aws dynamodb list-tables --endpoint-url http://localhost:8000
+$ aws dynamodb list-tables --endpoint-url http://localhost:8000 --region local
 ```
 
 テーブル作成
 ```
-$aws dynamodb create-table --table-name 'elden-talk-dev' --cli-input-json file://localdb.json --endpoint-url http://localhost:8000
+$aws dynamodb create-table --table-name '...' --cli-input-json file://localdb.json --endpoint-url http://localhost:8000 --region local
 ```
 
 データの永続化、SEEDも出来る
