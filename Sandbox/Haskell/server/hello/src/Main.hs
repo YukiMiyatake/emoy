@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Lib
+--import Lib
+import HtmlContent
 -- import Network.HTTP.Types
 -- import Network.Wai (Application, responseLBS)
 -- import Network.Wai.Handler.Warp (run)

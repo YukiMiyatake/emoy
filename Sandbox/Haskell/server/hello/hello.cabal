@@ -24,3 +24,5 @@ executable hello
                     , time
                     , wai
                     , warp
+                    , http-media
+                    , bytestring
