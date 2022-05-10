@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 
 	"github.com/looplab/fsm"
 )
@@ -13,38 +15,57 @@ const (
 	finish = ""
 )
 
-func main() {
+type MainState struct {
+	To  string
+	FSM *fsm.FSM
+}
 
-	eventTree := fsm.Events{
-		{Name: start, Src: []string{start}, Dst: middle},
-		{
-			Name: middle,
-			Src:  []string{start},
-			Dst:  end,
-		},
-		{
-			Name: end,
-			Src:  []string{end, start},
-			Dst:  finish,
-		},
-		{
-			Name: finish,
-			Src:  []string{finish, middle},
-			Dst:  finish,
-		},
+func NewMainState(to string) *MainState {
+	s := &MainState{
+		To: to,
 	}
 
-	ownFsm := fsm.NewFSM(
-		start,
-		eventTree,
-		fsm.Callbacks{},
+	s.FSM = fsm.NewFSM(
+		"init",
+		fsm.Events{
+			{Name: "Next", Src: []string{"init"}, Dst: "logo"},
+			{Name: "Next", Src: []string{"logo"}, Dst: "title"},
+			{Name: "Timeout", Src: []string{"title"}, Dst: "demo"},
+			{Name: "PushButton", Src: []string{"title"}, Dst: "title"},
+			{Name: "Timeout", Src: []string{"demo"}, Dst: "title"},
+			{Name: "PushButton", Src: []string{"demo"}, Dst: "title"},
+			{Name: "Start", Src: []string{"title"}, Dst: "gameStart"},
+			{Name: "Next", Src: []string{"gameStart"}, Dst: "gaming"},
+			{Name: "End", Src: []string{"gaming"}, Dst: "gameEnd"},
+		},
+		fsm.Callbacks{
+			"enter_state": func(e *fsm.Event) { s.enterState(e) },
+			//"before_event": func(e *fsm.Event) { e.Cancel() },  // Guard
+		},
 	)
 
-	ownFsm.Current()    // start
-	ownFsm.Event(start) // start eventが発火し、Dstのnodeへ遷移
-	ownFsm.Current()    // middle
+	return s
+}
+
+func (s *MainState) enterState(e *fsm.Event) {
+	fmt.Printf("%s to %s\n", e.Src, e.Dst)
+}
+
+func main() {
+
+	mainState := NewMainState("init")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		scanner.Scan()
+		in := scanner.Text()
+
+		err := mainState.FSM.Event(in)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 
 	//fsm.VisualizeWithType(ownFsm,fsm.GRAPHVIZ)
 	// http://www.webgraphviz.com/
-	fmt.Println("Hello")
 }
