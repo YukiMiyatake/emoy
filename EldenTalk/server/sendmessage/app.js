@@ -1,33 +1,25 @@
-const AWS = require('aws-sdk');
 
-//AWS.config.update({ region: process.env.AWS_REGION });
-const ddb = new AWS.DynamoDB.DocumentClient({ apiVersion: '2012-08-10' });
-
+const { getApiGatewayManagementApi, getDynamoDBClient } = require("../utils");
 const { TABLE_NAME } = process.env;
+
+const ddb = getDynamoDBClient();
+
 
 exports.handler = async (event, context) => {
   let connectionData;
 
-
-  try {
-    connectionData = await ddb.scan({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' }).promise();
-  } catch (e) {
-    return { statusCode: 500, body: e.stack };
+  const sender = await findConnectionById(ddb, connectionId);
+  if (sender.userId === undefined) {
+    return { statusCode: 400, body: 'State error.' };
   }
+
   console.log("send  " +  event.requestContext.connectionId)
   //AWS.config.update({ region: 'localhost' });
 console.log(event.requestContext.domainName + '/' + event.requestContext.stage)
 
 const {connectionId, apiId, stage} = event.requestContext;
+const apigwManagementApi = getApiGatewayManagementApi(domainName, stage);
 
-var endpoint =  process.env.IS_OFFLINE
-    ? 'http://localhost:3001'
-    : `https://${apiId}.execute-api.${process.env.AWS_REGION}.amazonaws.com/${stage}`;
-
-  const apigwManagementApi = new AWS.ApiGatewayManagementApi({
-    apiVersion: '2018-11-29',
-    endpoint: endpoint
-  });
 
   const postData = JSON.parse(event.body).data;
 

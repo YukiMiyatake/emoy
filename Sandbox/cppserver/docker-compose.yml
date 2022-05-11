@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  server:
+    build: 
+      context: ./server
+      args: 
+        - BOOST_VERSION=1.79.0
+        - BOOST_VERSION_=1_79_0
+    tty: true
+#    stdin_open: true
+    image: cpptest-server
+    working_dir: /app
+    volumes:
+      - ./server:/app
+    container_name: cpptest-server
+    ports:
+      - 8000:8000
+      - 8001:8001
+#    env_file:
+#      - .env
+
+#networks:
+#  serverless:
+#    external: true
