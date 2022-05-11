@@ -41,6 +41,7 @@ func NewMainState(to string) *MainState {
 		fsm.Callbacks{
 			"enter_state": func(e *fsm.Event) { s.enterState(e) },
 			//"before_event": func(e *fsm.Event) { e.Cancel() },  // Guard
+			"before_Timeout": func(e *fsm.Event) { e.Cancel() }, // Guard
 		},
 	)
 
