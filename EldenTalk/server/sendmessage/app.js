@@ -1,4 +1,7 @@
 
+console.log("sendmessage")
+
+const { findConnectionById } = require("../db");
 const { getApiGatewayManagementApi, getDynamoDBClient } = require("../utils");
 const { TABLE_NAME } = process.env;
 
@@ -6,28 +9,23 @@ const ddb = getDynamoDBClient();
 
 
 exports.handler = async (event, context) => {
+  const { apiId, stage } = event.requestContext;
+  const apigwManagementApi = getApiGatewayManagementApi(apiId, stage);
+
   let connectionData;
 
-  const sender = await findConnectionById(ddb, connectionId);
-  if (sender.userId === undefined) {
-    return { statusCode: 400, body: 'State error.' };
+  // 現状は全員にメッセージ送るからScanでいい
+  try {
+    connectionData = await ddb.scan({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' }).promise();
+  } catch (e) {
+    return { statusCode: 500, body: e.stack };
   }
-
-  console.log("send  " +  event.requestContext.connectionId)
-  //AWS.config.update({ region: 'localhost' });
-console.log(event.requestContext.domainName + '/' + event.requestContext.stage)
-
-const {connectionId, apiId, stage} = event.requestContext;
-const apigwManagementApi = getApiGatewayManagementApi(domainName, stage);
-
-
+ 
   const postData = JSON.parse(event.body).data;
 
   const postCalls = connectionData.Items.map(async ({ connectionId }) => {
     try {
         console.log({ ConnectionId: connectionId, Data: postData });
-
-
       await apigwManagementApi.postToConnection({ ConnectionId: connectionId, Data: postData }).promise();
     } catch (e) {
       if (e.statusCode === 410) {

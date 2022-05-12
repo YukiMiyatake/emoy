@@ -1,21 +1,20 @@
+console.log("OnDisconnect");
 const { getDynamoDBClient } = require("../utils");
-//var AWS = require("aws-sdk");
-//AWS.config.update({ region: process.env.AWS_REGION });
+const { deleteConnectionById } = require("../db");
 
 const ddb = getDynamoDBClient();
 
-exports.handler = function (event, context, callback) {
-  var deleteParams = {
-    TableName: process.env.TABLE_NAME,
-    Key: {
-      connectionId: { S: event.requestContext.connectionId }
-    }
-  };
-console.log("delete  " + event.requestContext.connectionId)
-  ddb.deleteItem(deleteParams, function (err) {
-    callback(null, {
-      statusCode: err ? 500 : 200,
-      body: err ? "Failed to disconnect: " + JSON.stringify(err) : "Disconnected."
-    });
-  });
+exports.handler = async event => {
+  const { connectionId } = event.requestContext;
+
+  try {
+    await deleteConnectionById(ddb, connectionId);
+  } catch (err) {
+    console.error(err)
+    return { statusCode: 500, body: 'Disconnect error  ' + err.Message };
+  }
+
+  console.log("delete  " + event.requestContext.connectionId)
+  return { statusCode: 200, body: 'Disconnected.' };
+
 };

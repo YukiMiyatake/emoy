@@ -4,7 +4,8 @@ function getDynamoDBClient() {
   const ddbOpt = process.env.IS_OFFLINE ?
     {
       region: "localhost",
-      endpoint: "http://localhost:8000"
+      endpoint: "http://localhost:8000",
+      apiVersion: "2012-10-08"
     } :
     {
       region: process.env.AWS_REGION
@@ -18,7 +19,7 @@ function getApiGatewayManagementApi(domainName, stage) {
     : domainName + '/' + stage;
 
   return new AWS.ApiGatewayManagementApi({
-    apiVersion: '2012-10-08',
+    apiVersion: '2018-11-29',
     endpoint
   });
 }
