@@ -42,17 +42,17 @@ provider:
 
 functions:
   connect:
-    handler: onconnect/app.handler
+    handler: src/onconnect/app.handler
     events:
       - websocket:
           route: $connect
   disconnect:
-    handler: ondisconnect/app.handler
+    handler: src/ondisconnect/app.handler
     events:
       - websocket:
           route: $disconnect
   sendmessage:
-    handler: sendmessage/app.handler
+    handler: src/sendmessage/app.handler
     events:
       - websocket:
           route: sendmessage
