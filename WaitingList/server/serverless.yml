@@ -1,0 +1,98 @@
+org: yojosenpai
+app: emoy-waitinglist
+service: ${env:APP_NAME, 'emoy-waitinglist'}
+frameworkVersion: '3'
+
+custom:
+  managerTableName: emoy-manage-${sls:stage}
+  connectionTableName: ${self:service}-connection-${sls:stage}
+  logTableName: ${self:service}-log-${sls:stage}
+  defaultStage: dev
+  dynamodb:
+#    docker: true
+    stages:
+      - dev
+    start:
+#      inMemory: true
+      migrate: true
+#useDotenv: true
+
+provider:
+  name: aws
+  stage: ${opt:stage, self:custom.defaultStage}
+  runtime: nodejs14.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - !Sub "${ManageTable.Arn}"  ###
+            - !Sub "${ConnectionTable.Arn}"
+            - !Sub "${LogTable.Arn}"
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - !Sub "${ManageTable.Arn}/index/" 
+            - !Sub "${ConnectionTable.Arn}/index/"
+            - !Sub "${LogTable.Arn}/index/"
+
+
+  environment:
+    APP_MANAGE_TABLE_NAME: ${self:custom.manageTableName}
+    APP_CONNECTION_TABLE_NAME: ${self:custom.connectionTableName}
+    APP_LOG_TABLE_NAME: ${self:custom.logTableName}
+  websocketsApiName: ${self:service}
+  websocketsApiRouteSelectionExpression: $request.body.action
+
+functions:
+  connect:
+    handler: src/onconnect/app.handler
+    events:
+      - websocket:
+          route: $connect
+  disconnect:
+    handler: src/ondisconnect/app.handler
+    events:
+      - websocket:
+          route: $disconnect
+  sendmessage:
+    handler: src/sendmessage/app.handler
+    events:
+      - websocket:
+          route: sendmessage
+
+resources:
+  Resources:
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+#        ProvisionedThroughput:
+#          ReadCapacityUnits: 5
+#          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: True
+
+
+plugins:
+#  - serverless-webpack
+  - serverless-dynamodb-local
+  - serverless-offline
+
+useDotenv: true

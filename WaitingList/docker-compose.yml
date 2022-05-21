@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  emoy-waitinglist:
+    build: 
+      context: ./server
+      args: 
+        - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+    tty: true
+    stdin_open: true
+    image: emoy-waitinglist
+    working_dir: /app
+    volumes:
+      - ./server:/app
+    container_name: emoy-waitinglist
+    ports:
+      - 8000:8000
+      - 8001:8001
+      - 3001:3001
+      - 3002:3002
+    environment:
+      AWS_PAGER: ""
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+#networks:
+#  serverless:
+#    external: true
