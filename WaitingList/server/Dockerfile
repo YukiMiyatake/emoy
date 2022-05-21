@@ -26,8 +26,8 @@ RUN npm install -g serverless \
 #COPY package*.json ./
 
 # dynamodb-local
-RUN apt-get install -y default-jre 
-RUN npm install -g dynamodb-admin 
+RUN apt-get install -y default-jre \
+    && npm install -g dynamodb-admin 
 
 # wscat
 RUN npm install -g wscat

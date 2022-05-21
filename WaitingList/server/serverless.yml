@@ -1,4 +1,3 @@
-#org: yukimiyatake
 app: emoy-waitinglist
 service: emoy-waitinglist
 frameworkVersion: '3'
