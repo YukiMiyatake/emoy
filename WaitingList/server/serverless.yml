@@ -1,10 +1,10 @@
-org: yojosenpai
+#org: yukimiyatake
 app: emoy-waitinglist
-service: ${env:APP_NAME, 'emoy-waitinglist'}
+service: emoy-waitinglist
 frameworkVersion: '3'
 
 custom:
-  managerTableName: emoy-manage-${sls:stage}
+  manageTableName: emoy-manage-${sls:stage}
   connectionTableName: ${self:service}-connection-${sls:stage}
   logTableName: ${self:service}-log-${sls:stage}
   defaultStage: dev
@@ -79,7 +79,6 @@ resources:
         AttributeDefinitions:
           - AttributeName: admin
             AttributeType: S
-        AttributeDefinitions:
           - AttributeName: appname
             AttributeType: S
         KeySchema:

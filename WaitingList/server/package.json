@@ -2,10 +2,15 @@
   "name": "waiting-list",
   "version": "1.0.0",
   "description": "",
+  "scripts": {
+    "dev": "concurrently \"sls offline start\""
+  },
+  "engines": {
+    "node": "16.14.2"
+  },
   "dependencies": {
-    "express": "^4.17.1",
-    "serverless-http": "^2.7.0",
-    "wscat": "^5.1.0"
+    "aws-sdk": "^2.1111.0",
+    "express": "^4.17.1"
   },
   "devDependencies": {
     "serverless-dynamodb-local": "^0.2.40",
