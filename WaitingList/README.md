@@ -163,7 +163,7 @@ createdAt N
 
 ### API(WebSocket)  
 #### *Admin ログイン
-(OnConnect時の認証しらべてみる)
+$connectにて、QueryStringで設定可能らしい
 
 #### *Admin パスワード変更
 #### *Admin 名前変更

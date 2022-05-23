@@ -11,7 +11,7 @@ exports.handler =  async event  => {
     await createConnectionById(ddb, connectionId);
   } catch (err) {
     console.error(err)
-    return { statusCode: 500, body: 'Failed to connect  ' +  err.message };
+    return { statusCode: 400, body: 'Failed to connect  ' +  err.message };
   }
 
 

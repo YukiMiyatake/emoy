@@ -1,11 +1,35 @@
-const { TABLE_NAME } = process.env;
+const { MANAGE_TABLE_NAME
+  , CONNECTION_TABLE_NAME
+  , LOG_TABLE_NAME 
+} = process.env;
+
+
+async function checkAdminLogin(ddb, admin, appname, password) {
+  const params = {
+    TableName: MANAGE_TABLE_NAME,
+    KeyConditionExpression: "#admin= :admin_val AND #appname  = :appname_val",
+    ExpressionAttributeNames:{
+        "#admin": "admin",
+        "#appname": "appname"
+    },
+    ExpressionAttributeValues: {
+        ":admin_val": admin,
+        ":appname_val": 'appname'
+    }
+  };
+  return ((await ddb.get(params).promise()).Item.password === password);
+}
+
+  
+
+
 
 async function createConnectionById(ddb, connectionId) {
   const item = {
     connectionId: connectionId
   }
   const params = {
-    TableName: TABLE_NAME,
+    TableName: CONNECTION_TABLE_NAME,
     Item: item
   };
   await ddb.put(params).promise();
@@ -14,7 +38,7 @@ async function createConnectionById(ddb, connectionId) {
 
 async function deleteConnectionById(ddb, connectionId) {
   const params = {
-    TableName: TABLE_NAME,
+    TableName: CONNECTION_TABLE_NAME,
     Key: {
       connectionId: connectionId
     }
@@ -24,7 +48,7 @@ async function deleteConnectionById(ddb, connectionId) {
 
 async function findConnectionById(ddb, connectionId) {
   const params = {
-    TableName: TABLE_NAME,
+    TableName: CONNECTION_TABLE_NAME,
     Key: {
       connectionId: connectionId
     }
@@ -35,7 +59,7 @@ async function findConnectionById(ddb, connectionId) {
 
 
 async function scanConnections(ddb) {
-    return await ddb.scan({ TableName: TABLE_NAME, ProjectionExpression: 'connectionId' }).promise();
+    return await ddb.scan({ TableName: CONNECTION_TABLE_NAME, ProjectionExpression: 'connectionId' }).promise();
   }
   
 

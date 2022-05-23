@@ -46,9 +46,9 @@ provider:
 
 
   environment:
-    APP_MANAGE_TABLE_NAME: ${self:custom.manageTableName}
-    APP_CONNECTION_TABLE_NAME: ${self:custom.connectionTableName}
-    APP_LOG_TABLE_NAME: ${self:custom.logTableName}
+    MANAGE_TABLE_NAME: ${self:custom.manageTableName}
+    CONNECTION_TABLE_NAME: ${self:custom.connectionTableName}
+    LOG_TABLE_NAME: ${self:custom.logTableName}
   websocketsApiName: ${self:service}
   websocketsApiRouteSelectionExpression: $request.body.action
 
