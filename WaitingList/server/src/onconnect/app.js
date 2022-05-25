@@ -6,6 +6,7 @@ const ddb = getDynamoDBClient();
 
 exports.handler =  async event  => {
   const { connectionId } = event.requestContext;
+  const { admin, password } = event.queryStringParameters;
 
   try {
     await createConnectionById(ddb, connectionId);
