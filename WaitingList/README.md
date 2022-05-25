@@ -163,7 +163,32 @@ createdAt N
 
 ### API(WebSocket)  
 #### *Admin ログイン
-$connectにて、QueryStringで設定可能らしい
+$connectにて、認証を行う
+認証方法は色々ある  
+https://websockets.readthedocs.io/en/latest/topics/authentication.html    
+- メッセージに認証情報をつける   
+どのルートでも、任意の場所で可能  
+- URLのQueryParameterで行う  
+$connectルートのみ  
+- HTTPのカスタムヘッダで行う  
+$connectルートのみ  
+URLに直にクレデンシャルが出ない  
+- Cookieで認証する  
+WebSocketとHTMLが異なるドメインの場合、対応出来ない  
+API Gatewayを使う、CloudFrontを置いたりの関係で難しいかもしれない  
+- URIにUserInformationを付ける  
+`ws://token:${token}@.../` こんなやつ  
+$connectルートのみ    
+API Gatewayだと多分対応できない  
+ブラウザも新しいバージョンでないと対応していない  
+  
+これらを色々考えて一つの案。Bearerトークンではあるが  
+例えば現在時刻等を HS256で user:pass などのキーで暗号化し  
+カスタムヘッダにてBearerトークンとして作る  
+サーバでDBから読んだ user:passで複合を行い、現在時刻と大きなズレがなければOK  
+これにより、ネットワークにパスワードが流れる、同じTokenを繰り返し使う事 を防げる  
+もちろん、wssにしてTLSにしてヘッダで送れば暗号化されるが、TLSを使いたくない場合でもOK  
+マジ天才  
 
 #### *Admin パスワード変更
 #### *Admin 名前変更
