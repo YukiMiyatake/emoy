@@ -1,8 +1,8 @@
 import type { AWS } from '@serverless/typescript';
 
 import onconnect from '@functions/onconnect';
-import ondisconnect from '@functions/ondisconnect';
-import sendmessage from '@functions/sendmessage';
+//import ondisconnect from '@functions/ondisconnect';
+//import sendmessage from '@functions/sendmessage';
 
 const serverlessConfiguration: AWS = {
   service: 'emoy-waitinglist',
@@ -15,9 +15,9 @@ const serverlessConfiguration: AWS = {
     logTableName: '${self:service}-log-${sls:stage}',
     defaultStage: 'dev',
     environment: {
-      dev: '${file(./env/dev.yml)}',
-      stg: '${file(./env/stg.yml)}',
-      prod: '${file(./env/prod.yml)}',
+//      dev: '${file(./env/dev.yml)}',
+//      stg: '${file(./env/stg.yml)}',
+//      prod: '${file(./env/prod.yml)}',
     },
     dynamodb: {
       stages: ['dev'],
@@ -112,7 +112,9 @@ const serverlessConfiguration: AWS = {
             },
           ],
           BillingMode: 'PAY_PER_REQUEST',
-          SSESpecification: true,
+          SSESpecification: {
+            SSEEnabled: true
+          },
         },
       },
       ConnectionTable: {
@@ -140,7 +142,9 @@ const serverlessConfiguration: AWS = {
             },
           ],
           BillingMode: 'PAY_PER_REQUEST',
-          SSESpecification: true,
+          SSESpecification: {
+            SSEEnabled: true
+          },
         },
       },
       LogTable: {
@@ -168,14 +172,17 @@ const serverlessConfiguration: AWS = {
             },
           ],
           BillingMode: 'PAY_PER_REQUEST',
-          SSESpecification: true,
+          SSESpecification: {
+            SSEEnabled: true
+          },
         },
       },    
     },
   },
 
   // import the function via paths
-  functions: [ onconnect, ondisconnect, sendmessage ],
+  functions: { onconnect },
+//  functions: [ onconnect, ondisconnect, sendmessage ],
   package: { individually: true },
 };
 

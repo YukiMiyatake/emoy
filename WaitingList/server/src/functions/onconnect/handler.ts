@@ -1,16 +1,28 @@
-import type { APIGatewayHandler } from '@libs/api-gateway';
-import { formatJSONResponse } from '@libs/api-gateway';
+import { APIGatewayHandler, formatJSONResponse, formatStringResponse } from '@libs/api-gateway';
 import { middyfy } from '@libs/lambda';
 //import schema from './schema';
+import {getDynamoDBClient} from '@libs/utils';
+import {createConnectionById} from '@libs/db';
+
+console.log("aaa")
 
 
 //const hello: ValidatedEventAPIGatewayProxyEvent<typeof schema> = async event => {
-const hello: APIGatewayHandler = async event => {
-    return formatJSONResponse(
-    200, {
-    message: `Hello ${event.body.name}, welcome to the exciting Serverless world!`,
-   
-  });
+const onconnect: APIGatewayHandler = async event => {
+  const { connectionId } = event.requestContext;
+//  const { admin, password } = event.queryStringParameters;
+
+  console.log("getDynamoDBClient") 
+  const ddb = getDynamoDBClient();
+  try {
+    console.log("createConnectionById") 
+    await createConnectionById(ddb, connectionId);
+  } catch (err) {
+    console.error(err)
+    return formatStringResponse(400, 'Failed to connect  ' +  err.message);
+  }
+
+  return formatStringResponse(200, 'Connected.');
 };
 
-export const main = middyfy(hello);
+export const main = middyfy(onconnect);

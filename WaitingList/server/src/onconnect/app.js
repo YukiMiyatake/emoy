@@ -1,4 +1,4 @@
-console.log("onconnect")
+console.log("onconnect!")
 const { getDynamoDBClient } = require("../utils");
 const { createConnectionById } = require("../db");
 
