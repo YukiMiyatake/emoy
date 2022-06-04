@@ -11,8 +11,24 @@ const { MANAGE_TABLE_NAME
 } = process.env;
 
 // APIの引数や戻り値をTypeしたい
+export async function createAdmin(ddb: DynamoDBClient, admin: string, appname: string, password: string) {
+  const params: PutCommandInput = {
+    TableName: CONNECTION_TABLE_NAME,
+    Item: {
+      admin: admin,
+      appname: appname,
+      password: password 
+    }
+  };
+
+  console.log("put: " + JSON.stringify(params))
+  const item = await ddb.send( new PutCommand(params));
+  return item;
+}
 
 export async function checkAdminLogin(ddb: DynamoDBClient, admin: string, appname: string, password: string) {
+  if(admin==="") return false;
+
   const params: QueryCommandInput = {
     TableName: MANAGE_TABLE_NAME,
     KeyConditionExpression: "#admin= :admin_val AND #appname  = :appname_val",
@@ -31,29 +47,20 @@ export async function checkAdminLogin(ddb: DynamoDBClient, admin: string, appnam
 
 
 
-export async function createConnectionById(ddb: DynamoDBClient, connectionId: string) {
+export async function createConnectionById(ddb: DynamoDBClient, connectionId: string, isAdmin: boolean) {
   console.log("createConnectionById[" + CONNECTION_TABLE_NAME + "]")
 
   const params: PutCommandInput = {
     TableName: CONNECTION_TABLE_NAME,
     Item: {
-      connectionId: connectionId 
+      connectionId: connectionId,
+      isAdmin: isAdmin 
     }
   };
 
   console.log("put: " + JSON.stringify(params))
   const item = await ddb.send( new PutCommand(params));
   return item;
-}
-
-export async function deleteConnectionById(ddb: DynamoDBClient, connectionId: string) {
-  const params: DeleteCommandInput = {
-    TableName: CONNECTION_TABLE_NAME,
-    Key: {
-      connectionId: connectionId
-    }
-  };
-  return(await ddb.send(new DeleteCommand(params)));
 }
 
 export async function findConnectionById(ddb: DynamoDBClient, connectionId: string) {
@@ -66,7 +73,15 @@ export async function findConnectionById(ddb: DynamoDBClient, connectionId: stri
   return (await ddb.send(new GetCommand(params))).Item;
 }
 
-
+export async function deleteConnectionById(ddb: DynamoDBClient, connectionId: string) {
+  const params: DeleteCommandInput = {
+    TableName: CONNECTION_TABLE_NAME,
+    Key: {
+      connectionId: connectionId
+    }
+  };
+  return(await ddb.send(new DeleteCommand(params)));
+}
 
 export async function scanConnections(ddb: DynamoDBClient) {
   const params: ScanCommandInput = {

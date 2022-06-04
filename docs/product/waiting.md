@@ -18,9 +18,9 @@ API Gateway+WebSocket+Lambda+DynamoDB+S3
 (今後ユーザリスト等を追加する)
   
 #### 接続管理テーブル  
-管理者名 S PK  
-ユーザ名 S SK  
-ConnectionId S    
+ConnectionId S PK
+isAdmin N
+
   
 #### ログテーブル(1日程度で消える)  
 管理者名 S PK  

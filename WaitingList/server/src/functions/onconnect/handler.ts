@@ -2,7 +2,7 @@ import { APIGatewayHandler, formatJSONResponse, formatStringResponse } from '@li
 import { middyfy } from '@libs/lambda';
 //import schema from './schema';
 import {getDynamoDBClient} from '@libs/utils';
-import {createConnectionById} from '@libs/db';
+import {createConnectionById, checkAdminLogin} from '@libs/db';
 
 console.log("aaa")
 
@@ -10,11 +10,13 @@ console.log("aaa")
 //const hello: ValidatedEventAPIGatewayProxyEvent<typeof schema> = async event => {
 const onconnect: APIGatewayHandler = async event => {
   const { connectionId } = event.requestContext;
-//  const { admin, password } = event.queryStringParameters;
+  const { admin="", appname="", password="" } = event.queryStringParameters;
 
   console.log("getDynamoDBClient") 
   const ddb = getDynamoDBClient();
   try {
+    const isAdmin = checkAdminLogin(ddb, admin, appname, password);
+
     console.log("createConnectionById") 
     await createConnectionById(ddb, connectionId);
   } catch (err) {
