@@ -1,5 +1,6 @@
+[Pick/ban](product/pickban.md)
+[レーティングシステム](product/rating.md)
 
-[レーティングシステム](product/rating.uif.tpl)
 ## ゲームを広める
 今はYoutubeやTwitchなどのゲーム配信が最も効率が良さそう
 SNSやメディアを作るのもあり
