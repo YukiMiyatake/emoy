@@ -19,7 +19,7 @@ API Gateway+WebSocket+Lambda+DynamoDB+S3
 開始ボタンを押したら開始。  
 ログデータ作成    
 青、赤(パスワード有)用のURLと観戦用のURLの作成  
-案：http://hogehoge(S3のURL)/admin/gameId/blue  
+案：http://hogehoge(S3のURL)/adminname/gameId/blue  
 その後は観戦用画面みたいな画面になる（別途キャンセルや一時停止ボタン）  
   
 [リーダー用画面]  
@@ -41,20 +41,28 @@ Pick/Banのリストのみの表示
   
 #### 管理者テーブル(全てのシステム共通にしたい)  
 emoy-admin  
-ユーザ名 S PK   Yojo  
-アプリ名 S SK   wildrift-pickban  
-パスワード S  
+admin S PK   Yojo  
+appname S SK   wildrift-pickban  
+password S  
 (今後ユーザリスト等を追加する)
   
+
+#### Gameテーブル(複数する時に作る)   
+emoy-pickban-games  
+管理者名 S PK   Yojo  
+connectionId S  xxxxxx  
+gameId   S xxxx  
   
 #### ログテーブル(1日程度で消える)  
 emoy-pickban-log  
 管理者名 S PK   Yojo  
-ゲームID S RK   xxxxxx  
+(gameId S RK   xxxxxx)  
 Title S    
+TeamName [S]    
 ConnectionIdAdmin S
 ConnectionIdLeaders [S]     # 両チームのリーダーの
-ConnectionIdSpectators [S]  # 観戦者の
+ConnectionIdSpectators [S]  # 観戦者の  
+leaderPassword S   
 data  [LOGDATA]   # ログデータ 
 CreatedAt N    
   
@@ -69,12 +77,36 @@ LOGDATA{
 
 
 ### 画面  
-#### 管理者  
-
-
-
+#### 管理者(Ver 0)  
+ログイン画面    
+name/ID  Storageに保存。HTTP API  
+(将来的に、パスワード変更、忘れた等を追加)  
   
+管理画面  
+ゲーム名  
+青チーム名 赤チーム名  
+ルール選択  
+開始/削除  
+  
+BAN/Pick画面(観戦者とだいたい同じ)  
+ゲーム名  
+青チーム名 赤チーム名  
+BAN/PICK状態  
+時間  
+(一時停止) 管理者のみ    
+  
+  
+#### リーダー(Ver 0)  
+ゲーム名  
+青チーム名 赤チーム名  
+BAN/PICK状態  
+時間  
+チャンピオン選択(ソート等はフロントで頑張りたい)    
+
+
+
+
 ## 今後実装したいもの  
-
-  
-
+複数ゲームの作成  
+管理画面の共通化  
+ランダムチャンピオンから選択(別アプリだけど、ランダムあるいは管理人が選ぶチャンプからトレード)  
