@@ -5,13 +5,13 @@ import onconnect from '@functions/onconnect';
 //import sendmessage from '@functions/sendmessage';
 
 const serverlessConfiguration: AWS = {
-  service: 'emoy-waitinglist',
+  service: 'emoy-pickban',
   frameworkVersion: '3',
-  app: 'emoy-waitinglist',
+  app: 'emoy-pickban',
   plugins: ['serverless-esbuild', 'serverless-dynamodb-local', 'serverless-offline'],
   custom: {
     manageTableName: 'emoy-manage-${sls:stage}',
-    connectionTableName: '${self:service}-connection-${sls:stage}',
+    //gameTableName: '${self:service}-games-${sls:stage}',
     logTableName: '${self:service}-log-${sls:stage}',
     defaultStage: 'dev',
     environment: {
@@ -81,7 +81,7 @@ const serverlessConfiguration: AWS = {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
       NODE_OPTIONS: '--enable-source-maps --stack-trace-limit=1000',
       MANAGE_TABLE_NAME: '${self:custom.manageTableName}',
-      CONNECTION_TABLE_NAME: '${self:custom.connectionTableName}',
+      //GAME_TABLE_NAME: '${self:custom.gameTableName}',
       LOG_TABLE_NAME: '${self:custom.logTableName}',
     },
   },
@@ -117,6 +117,7 @@ const serverlessConfiguration: AWS = {
           },
         },
       },
+      /*
       ConnectionTable: {
         Type: 'AWS::DynamoDB::Table',
         Properties: {
@@ -147,6 +148,7 @@ const serverlessConfiguration: AWS = {
           },
         },
       },
+      */
       LogTable: {
         Type: 'AWS::DynamoDB::Table',
         Properties: {

@@ -56,7 +56,7 @@ gameId   S xxxx
 #### ログテーブル(1日程度で消える)  
 emoy-pickban-log  
 管理者名 S PK   Yojo  
-(gameId S RK   xxxxxx)  
+CreatedAt N RK  (事実上gameId)   
 Title S    
 TeamName [S]    
 ConnectionIdAdmin S
@@ -64,13 +64,13 @@ ConnectionIdLeaders [S]     # 両チームのリーダーの
 ConnectionIdSpectators [S]  # 観戦者の  
 leaderPassword S   
 data  [LOGDATA]   # ログデータ 
-CreatedAt N    
   
 LOGDATA{  
   side: 0|1   # 0=Blue 1=Red  
   type: 0|1   # 0=pick 1=ban  
   result: N?  # 選択したチャンピオン番号。   
   status: 0|1 # 0=未決定 1=決定
+  startAt: N
 }  
 
 
