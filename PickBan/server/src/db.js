@@ -1,5 +1,5 @@
 const { MANAGE_TABLE_NAME
-  , CONNECTION_TABLE_NAME
+//  , CONNECTION_TABLE_NAME
   , LOG_TABLE_NAME 
 } = process.env;
 
@@ -21,10 +21,14 @@ async function checkAdminLogin(ddb, admin, appname, password) {
 }
 
   
+type createLogtableData = {
+  admin: string
+  createdAt: number
+  teamName: [string]
+}
 
 
-
-async function createConnectionById(ddb, connectionId) {
+async function createLogTable(ddb, connectionId) {
   const item = {
     connectionId: connectionId
   }
