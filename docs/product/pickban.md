@@ -51,7 +51,7 @@ password S
 emoy-pickban-games  
 管理者名 S PK   Yojo  
 connectionId S  xxxxxx  
-gameId   S xxxx  
+gameId=CreatedAt   [S] xxxx  
   
 #### ログテーブル(1日程度で消える)  
 emoy-pickban-log  
