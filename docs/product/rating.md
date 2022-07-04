@@ -13,6 +13,15 @@ Websocketではなく、Dynamo直でいいかも
 まずは管理人は一人で管理人が全て登録する  
 
 
+aws dynamodb update-item \
+    --table-name test \
+    --key '{ "id": {"S": "wildrift-yojo"}}' \
+    --update-expression "SET user.Yojo.memo = :newval" \
+    --expression-attribute-values '{":newval":{"S":"Memooo"}}' \
+    --return-values ALL_NEW
+
+
+PYLrTKEeNJ7HAY0f
 id PK wildrift+yojo
 
 {
