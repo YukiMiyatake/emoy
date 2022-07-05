@@ -14,10 +14,20 @@ Websocketではなく、Dynamo直でいいかも
 
 
 aws dynamodb update-item \
+aws dynamodb update-item --endpoint-url http://localhost:8000 \
     --table-name test \
     --key '{ "id": {"S": "wildrift-yojo"}}' \
     --update-expression "SET user.Yojo.memo = :newval" \
     --expression-attribute-values '{":newval":{"S":"Memooo"}}' \
+    --return-values ALL_NEW
+
+
+aws dynamodb update-item --endpoint-url http://localhost:8000 \
+    --table-name test \
+    --key '{ "id": {"S": "wildrift-yojo"}}' \
+    --update-expression "SET player.Yojo.rate[0].win = :newval" \
+    --expression-attribute-names '{}' \
+    --expression-attribute-values '{":newval":{"N":"1"}}' \
     --return-values ALL_NEW
 
 
@@ -28,7 +38,7 @@ id PK wildrift+yojo
   "id": {
     "S": "wildrift-yojo"
   },
-  "user": {
+  "player": {
     "M": {
       "Yojo": {
         "M": {
