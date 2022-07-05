@@ -26,8 +26,14 @@ aws dynamodb update-item --endpoint-url http://localhost:8000 \
     --table-name test \
     --key '{ "id": {"S": "wildrift-yojo"}}' \
     --update-expression "SET player.Yojo.rate[0].win = :newval" \
-    --expression-attribute-names '{}' \
-    --expression-attribute-values '{":newval":{"N":"1"}}' \
+    --expression-attribute-values '{":newval":{"N":"99"}}' \
+    --return-values ALL_NEW
+
+aws dynamodb update-item --endpoint-url http://localhost:8000 \
+    --table-name test \
+    --key '{ "id": {"S": "wildrift-yojo"}}' \
+    --update-expression "ADD player.Yojo.rate[0].win :val, player.Yojo.rate[0].lose :val" \
+    --expression-attribute-values '{":val":{"N":"2"}}' \
     --return-values ALL_NEW
 
 
