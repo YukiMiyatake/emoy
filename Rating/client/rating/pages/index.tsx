@@ -4,6 +4,9 @@ import Image from 'next/image'
 import styles from '../styles/Home.module.css'
 
 const Home: NextPage = () => {
+
+  const data = [{name:"名前1"},{name:"名前2"},{name:"名前3"}];
+
   return (
     <div className={styles.container}>
       <Head>
@@ -16,6 +19,14 @@ const Home: NextPage = () => {
         <h1 className={styles.title}>
           League of Legends Rating System
         </h1>
+
+        <ul>
+          {data.map((value, index) => (
+              <li className='p-4' key={index}>
+                <span className='font-bold' >{value.name}</span>
+              </li>
+            ))}
+        </ul>
 
       </main>
 
