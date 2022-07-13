@@ -3,6 +3,15 @@ import Head from 'next/head'
 import Image from 'next/image'
 import styles from '../styles/Home.module.css'
 
+import React, { useState, useCallback } from "react";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import type {
+  DropResult,
+  DroppableProvided,
+  DraggableProvided
+} from "react-beautiful-dnd";
+
+
 const Home: NextPage = () => {
 
   const data = [{name:"名前1"},{name:"名前2"},{name:"名前3"}];
