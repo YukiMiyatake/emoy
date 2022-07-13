@@ -54,20 +54,22 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
           };
         }, [dragOver]);
     
-        const entries = ordered.columns.entries();
+        const blue = ordered.columns.slice(0,5);
+        const red = ordered.columns.slice(5,10);
 
         return (
-          <div className="container">
-              <span className="col"> <span className="row">a</span><span className="row">b</span><span className="row">c</span> </span>
-              <span className="col"> <span className="row">1</span><span className="row">2</span><span className="row">3</span> </span>
+          <table className="container">
+              <tr>
+              <td className="col"> 
 
+                <table>
                 {
 
-                ordered.columns.map(({ id, value }) => (
-                    <>
+                blue.map(({ id, value }) => (
+                    
 
 
-                    <span
+                    <tr 
                         key={id}
                         draggable
                         onDragStart={() => dragStart(id)}
@@ -78,20 +80,62 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
                       onDragLeave={() => dragLeave()}
                       onDrop={() => drop(id)}
                       onDragEnd={handleDragEnd}
-                      className="col"
+                      className="row"
                       data-id={id}
                     >
                       {value}
-                    </span>
+                    </tr>
 
 
 
-                    </>
+                    
 
                 ))
                 
                 }
-                </div>
+                </table>
+                </td>
+
+
+                <td className="col"> 
+                <table>
+                {
+
+                red.map(({ id, value }) => (
+                    
+
+
+                    <tr
+                        key={id}
+                        draggable
+                        onDragStart={() => dragStart(id)}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            dragOver(e);
+                        }}
+                    onDragLeave={() => dragLeave()}
+                    onDrop={() => drop(id)}
+                    onDragEnd={handleDragEnd}
+                    className="row"
+                    data-id={id}
+                    >
+                    {value}
+                    </tr>
+
+
+
+                    
+
+                ))
+
+                }
+                </table>
+                </td>
+                
+
+                </tr>
+
+            </table>
 
         );
       }
