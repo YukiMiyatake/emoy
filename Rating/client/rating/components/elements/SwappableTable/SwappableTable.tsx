@@ -14,33 +14,33 @@ import { useOrderedCells } from "./useOrderdCells";
 
 
 export type Props = Readonly<
-  {
-    columns: { id: string; value: string }[];
-    rows: string[][];
-  } & Omit<ComponentPropsWithoutRef<"table">, "className">
+    {
+        columns: { id: string; value: string }[];
+        //rows: string[][];
+    } & Omit<ComponentPropsWithoutRef<"div">, "className">
 >;
 
 export const SwappableTable = forwardRef<HTMLTableElement, Props>(
     (props, ref) => {
-        const { columns, rows, ...rest } = props;
+        const { columns, ...rest } = props;
     
-        const [ordered, changeOrder] = useOrderedCells(columns, rows);
+        const [ordered, changeOrder] = useOrderedCells(columns);
     
         const [dndState, { dragStart, dragEnter, dragLeave, drop, dragEnd }] =
-          useDnD();
+            useDnD();
     
         const dragOver = useMemo(() => {
-          return throttle<DragEventHandler<HTMLDivElement>>((e) => {
-            if (!(e.target instanceof HTMLDivElement)) {
-              return;
-            }
+            return throttle<DragEventHandler<HTMLDivElement>>((e) => {
+                if (!(e.target instanceof HTMLDivElement)) {
+                    return;
+                }
             const { id } = e.target.dataset;
     
-            if (id) {
-              //changeOrder(dndState.draggedId, dndState.hoveredId);
-              dragEnter(id);
-            }
-          }, 300);
+                if (id) {
+                    //changeOrder(dndState.draggedId, dndState.hoveredId);
+                    dragEnter(id);
+                }
+            }, 300);
         }, [dragEnter]);
     
         const handleDragEnd: DragEventHandler<HTMLDivElement> = () => {
@@ -54,56 +54,45 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
           };
         }, [dragOver]);
     
+        const entries = ordered.columns.entries();
+
         return (
-          <table ref={ref} {...rest}>
-            <thead>
-              <tr>
-                {ordered.columns.map(({ id, value }) => (
-                  <td
-                    key={id}
-                    className={classnames(
-                      "border",
-                      "border-gray-400",
-                      "bg-gray-200"
-                    )}
-                  >
-                    <div
-                      draggable
-                      onDragStart={() => dragStart(id)}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        dragOver(e);
-                      }}
+          <div className="container">
+              <span className="col"> <span className="row">a</span><span className="row">b</span><span className="row">c</span> </span>
+              <span className="col"> <span className="row">1</span><span className="row">2</span><span className="row">3</span> </span>
+
+                {
+
+                ordered.columns.map(({ id, value }) => (
+                    <>
+
+
+                    <span
+                        key={id}
+                        draggable
+                        onDragStart={() => dragStart(id)}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            dragOver(e);
+                        }}
                       onDragLeave={() => dragLeave()}
                       onDrop={() => drop(id)}
                       onDragEnd={handleDragEnd}
-                      className={classnames("p-2", {
-                        ["bg-blue-200"]: dndState.draggedId === id,
-                        ["bg-red-200"]: dndState.hoveredId === id,
-                      })}
+                      className="col"
                       data-id={id}
                     >
                       {value}
-                    </div>
-                  </td>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ordered.rows.map((row, i) => (
-                <tr key={i}>
-                  {row.map((item, j) => (
-                    <td
-                      key={j}
-                      className={classnames("border", "border-gray-400", "p-2")}
-                    >
-                      {item}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </span>
+
+
+
+                    </>
+
+                ))
+                
+                }
+                </div>
+
         );
       }
 );

@@ -8,19 +8,17 @@ const Home: NextPage = () => {
 
   const data = {
     columns: [
-      { id: "column-1", value: "column 1" },
-      { id: "column-2", value: "column 2" },
-      { id: "column-3", value: "column 3" },
-      { id: "column-4", value: "column 4" },
-      { id: "column-5", value: "column 5" },
-    ],
-    rows: [
-      ["1", "2", "3", "4", "5"],
-      ["1", "2", "3", "4", "5"],
-      ["1", "2", "3", "4", "5"],
-      ["1", "2", "3", "4", "5"],
-      ["1", "2", "3", "4", "5"],
-    ],
+      { id: "0", value: "0" },
+      { id: "1", value: "1" },
+      { id: "2", value: "2" },
+      { id: "3", value: "3" },
+      { id: "4", value: "4" },
+      { id: "5", value: "5" },
+      { id: "6", value: "6" },
+      { id: "7", value: "7" },
+      { id: "8", value: "8" },
+      { id: "9", value: "9" },
+    ]
   };
 
   return (

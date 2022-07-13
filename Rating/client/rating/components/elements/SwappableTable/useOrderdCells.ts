@@ -5,10 +5,10 @@ import { swap } from "../../../utils/swap";
 
 export const useOrderedCells = (
   columns: Props["columns"],
-  rows: Props["rows"]
+ // rows: Props["rows"]
 ) => {
   const [orderedColumns, setOrderedColumns] = useState(columns);
-  const [orderedRows, setOrderedRows] = useState(rows);
+ // const [orderedRows, setOrderedRows] = useState(rows);
 
   const changeOrder = useCallback(
     (fromId: string | undefined, toId: string | undefined) => {
@@ -22,13 +22,13 @@ export const useOrderedCells = (
       const resultColumns = swap(columns, fromIndex, toIndex);
 
       // rows の中の配列を desiredSort の順に並び替える
-      const resultRows = rows.map((row) => swap(row, fromIndex, toIndex));
+    //  const resultRows = rows.map((row) => swap(row, fromIndex, toIndex));
 
       setOrderedColumns(resultColumns);
-      setOrderedRows(resultRows);
+   //   setOrderedRows(resultRows);
     },
-    [columns, rows]
+    [columns]
   );
 
-  return [{ columns: orderedColumns, rows: orderedRows }, changeOrder] as const;
+  return [{ columns: orderedColumns }, changeOrder] as const;
 };
