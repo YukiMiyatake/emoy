@@ -15,17 +15,19 @@ import { useOrderedCells } from "./useOrderdCells";
 
 export type Props = Readonly<
     {
-        columns: { id: string; value: string }[];
+        blue: { id: string; value: string }[];
+        red: { id: string; value: string }[];
         //rows: string[][];
     } & Omit<ComponentPropsWithoutRef<"div">, "className">
 >;
 
 export const SwappableTable = forwardRef<HTMLTableElement, Props>(
     (props, ref) => {
-        const { columns, ...rest } = props;
+        //const { columns, ...rest } = props;
     
-        const [ordered, changeOrder] = useOrderedCells(columns);
-    
+        const [ordered, changeOrder] = useOrderedCells(props);
+        //const [state, setState] = useState([getItems(10), getItems(5, 10)]);
+
         const [dndState, { dragStart, dragEnter, dragLeave, drop, dragEnd }] =
             useDnD();
     
@@ -54,7 +56,7 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
           };
         }, [dragOver]);
     
-        const blue = ordered.columns.slice(0,5);
+        const blue = ordered.blue;
         const red = ordered.columns.slice(5,10);
 
         return (
