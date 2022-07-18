@@ -1,9 +1,9 @@
 import React, {
-    ComponentPropsWithoutRef,
-    DragEventHandler,
-    forwardRef,
-    useEffect,
-    useMemo,
+  ComponentPropsWithoutRef,
+  DragEventHandler,
+  forwardRef,
+  useEffect,
+  useMemo,
 } from "react";
 
 import throttle from "lodash.throttle";
@@ -14,102 +14,100 @@ import { useOrderedCells } from "./useOrderdCells";
 
 
 export type Props = Readonly<
-    {
-        //blue: { id: string; value: string }[];
-        //red: { id: string; value: string }[];
-        columns: { id: string; value: string }[];
-        //rows: string[][];
-    } & Omit<ComponentPropsWithoutRef<"table">, "className">
+  {
+    //blue: { id: string; value: string }[];
+    //red: { id: string; value: string }[];
+    columns: { id: string; value: string }[];
+    //rows: string[][];
+  } & Omit<ComponentPropsWithoutRef<"table">, "className">
 >;
 
 export const SwappableTable = forwardRef<HTMLTableElement, Props>(
-    (props, ref) => {
-        const { columns, ...rest } = props;
-    
-        const [ordered, changeOrder] = useOrderedCells(columns);
-        //const [state, setState] = useState([getItems(10), getItems(5, 10)]);
+  (props, ref) => {
+    const { columns, ...rest } = props;
 
-        const [dndState, { dragStart, dragEnter, dragLeave, drop, dragEnd }] =
-            useDnD();
-    
-        const dragOver = useMemo(() => {
-            return throttle<DragEventHandler<HTMLElement>>((e) => {
-                if (!(e.target instanceof HTMLElement)) {
-                    return;
-                }
-            const { id } = e.target.dataset;
-    
-                if (id) {
-                    //changeOrder(dndState.draggedId, dndState.hoveredId);
-                    dragEnter(id);
-                }
-            }, 300);
-        }, [dragEnter]);
-    
-        const handleDragEnd: DragEventHandler<HTMLElement> = () => {
-          changeOrder(dndState.draggedId, dndState.hoveredId);
-          dragEnd();
-        };
-    
-        useEffect(() => {
-          return () => {
-            dragOver.cancel();
-          };
-        }, [dragOver]);
-    
+    const [ordered, changeOrder] = useOrderedCells(columns);
+    //const [state, setState] = useState([getItems(10), getItems(5, 10)]);
 
-        return (
-          <table className="container">
-            <thead><tr><th>Blue</th><th>Red</th></tr></thead>
-            <tbody>
-                {
-                    [...Array(5)].map((_, i) => (
+    const [dndState, { dragStart, dragEnter, dragLeave, drop, dragEnd }] =
+      useDnD();
 
-                        <tr key={i+100}>
+    const dragOver = useMemo(() => {
+      return throttle<DragEventHandler<HTMLElement>>((e) => {
+        if (!(e.target instanceof HTMLElement)) {
+          return;
+        }
+        const { id } = e.target.dataset;
 
-                        <td 
-                        key={columns[i].id}
-                        draggable
-                        onDragStart={() => dragStart(columns[i].id)}
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            dragOver(e);
-                        }}
-                        onDragLeave={() => dragLeave()}
-                        onDrop={() => drop(columns[i].id)}
-                        onDragEnd={handleDragEnd}
-                        className="col"
-                        data-id={columns[i].id}
-                        >
-                        {columns[i].value}
-                        </td>
+        if (id) {
+          //changeOrder(dndState.draggedId, dndState.hoveredId);
+          dragEnter(id);
+        }
+      }, 300);
+    }, [dragEnter]);
+
+    const handleDragEnd: DragEventHandler<HTMLElement> = () => {
+      changeOrder(dndState.draggedId, dndState.hoveredId);
+      dragEnd();
+    };
+
+    useEffect(() => {
+      return () => {
+        dragOver.cancel();
+      };
+    }, [dragOver]);
 
 
-                        <td 
-                        key={columns[i+5].id}
-                        draggable
-                        onDragStart={() => dragStart(columns[i+5].id)}
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            dragOver(e);
-                        }}
-                        onDragLeave={() => dragLeave()}
-                        onDrop={() => drop(columns[i+5].id)}
-                        onDragEnd={handleDragEnd}
-                        className="col"
-                        data-id={columns[i+5].id}
-                        >
-                        {columns[i+5].value}
-                        </td>
+    return (
+      <div className="container">
+        <div className="row"><div className="col text-primary">Blue</div>
+          <div className="col text-danger">Red</div></div>
 
-                        </tr>
-                    ))
-                } 
+        {
+          [...Array(5)].map((_, i) => (
 
-              </tbody>
-            </table>
+            <div className="row" key={i + 100}>
 
-        );
-      }
+              <div className="col border border-primary"
+                key={columns[i].id}
+                draggable
+                onDragStart={() => dragStart(columns[i].id)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  dragOver(e);
+                }}
+                onDragLeave={() => dragLeave()}
+                onDrop={() => drop(columns[i].id)}
+                onDragEnd={handleDragEnd}
+                data-id={columns[i].id}
+              >
+                {columns[i].value}
+              </div>
+
+
+              <div className="col border border-danger"
+                key={columns[i + 5].id}
+                draggable
+                onDragStart={() => dragStart(columns[i + 5].id)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  dragOver(e);
+                }}
+                onDragLeave={() => dragLeave()}
+                onDrop={() => drop(columns[i + 5].id)}
+                onDragEnd={handleDragEnd}
+                data-id={columns[i + 5].id}
+              >
+                {columns[i + 5].value}
+              </div>
+
+            </div>
+          ))
+        }
+
+      </div>
+
+    );
+  }
 );
 SwappableTable.displayName = "SwappableTable";
