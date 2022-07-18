@@ -12,14 +12,15 @@ import { classnames } from "tailwindcss-classnames";
 import { useDnD } from "./useDnD";
 import { useOrderedCells } from "./useOrderdCells";
 
-
+// 表示中身コンポーネント作成しなきゃ
+// 5vs5だけど汎用的にしたい
 export type Props = Readonly<
   {
     //blue: { id: string; value: string }[];
     //red: { id: string; value: string }[];
     columns: { id: string; value: string }[];
     //rows: string[][];
-  } & Omit<ComponentPropsWithoutRef<"table">, "className">
+  } & Omit<ComponentPropsWithoutRef<"div">, "className">
 >;
 
 export const SwappableTable = forwardRef<HTMLTableElement, Props>(
