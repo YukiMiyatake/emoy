@@ -19,7 +19,7 @@ export type Props = Readonly<
         //red: { id: string; value: string }[];
         columns: { id: string; value: string }[];
         //rows: string[][];
-    } & Omit<ComponentPropsWithoutRef<"div">, "className">
+    } & Omit<ComponentPropsWithoutRef<"table">, "className">
 >;
 
 export const SwappableTable = forwardRef<HTMLTableElement, Props>(
@@ -33,8 +33,8 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
             useDnD();
     
         const dragOver = useMemo(() => {
-            return throttle<DragEventHandler<HTMLDivElement>>((e) => {
-                if (!(e.target instanceof HTMLDivElement)) {
+            return throttle<DragEventHandler<HTMLElement>>((e) => {
+                if (!(e.target instanceof HTMLElement)) {
                     return;
                 }
             const { id } = e.target.dataset;
@@ -46,7 +46,7 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
             }, 300);
         }, [dragEnter]);
     
-        const handleDragEnd: DragEventHandler<HTMLDivElement> = () => {
+        const handleDragEnd: DragEventHandler<HTMLElement> = () => {
           changeOrder(dndState.draggedId, dndState.hoveredId);
           dragEnd();
         };
