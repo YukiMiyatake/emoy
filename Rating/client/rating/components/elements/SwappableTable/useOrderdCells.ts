@@ -4,17 +4,17 @@ import { Props } from ".";
 import { swap } from "../../../utils/swap";
 
 export const useOrderedCells = (
-  columns: Props
+  columns: Props["columns"]
 ) => {
 
-  const blue = columns["blue"];
-  const red = columns["red"];
-
-  const [orderedColumns, setOrderedColumns] = useState([blue,red]);
- // const [orderedRows, setOrderedRows] = useState(rows);
+  //const blue = columns["blue"];
+  //const red = columns["red"];
+  
+  //const [orderedColumns, setOrderedColumns] = useState([blue,red]);
+  const [orderedColumns, setOrderedColumns] = useState(columns);
 
   const find = (target: string) => {
-    columns.blue.findIndex(({ id }) => id === target);
+    columns.findIndex(({ id }) => id === target);
   }
 
   const changeOrder = useCallback(

@@ -15,17 +15,18 @@ import { useOrderedCells } from "./useOrderdCells";
 
 export type Props = Readonly<
     {
-        blue: { id: string; value: string }[];
-        red: { id: string; value: string }[];
+        //blue: { id: string; value: string }[];
+        //red: { id: string; value: string }[];
+        columns: { id: string; value: string }[];
         //rows: string[][];
     } & Omit<ComponentPropsWithoutRef<"div">, "className">
 >;
 
 export const SwappableTable = forwardRef<HTMLTableElement, Props>(
     (props, ref) => {
-        //const { columns, ...rest } = props;
+        const { columns, ...rest } = props;
     
-        const [ordered, changeOrder] = useOrderedCells(props);
+        const [ordered, changeOrder] = useOrderedCells(columns);
         //const [state, setState] = useState([getItems(10), getItems(5, 10)]);
 
         const [dndState, { dragStart, dragEnter, dragLeave, drop, dragEnd }] =
@@ -56,87 +57,56 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
           };
         }, [dragOver]);
     
-        const blue = ordered.blue;
-        const red = ordered.columns.slice(5,10);
 
         return (
           <table className="container">
-              <tr>
-              <td className="col"> 
-
-                <table>
+            <thead><tr><th>Blue</th><th>Red</th></tr></thead>
+            <tbody>
                 {
+                    [...Array(5)].map((_, i) => (
 
-                blue.map(({ id, value }) => (
-                    
+                        <tr key={i+100}>
 
-
-                    <tr 
-                        key={id}
+                        <td 
+                        key={columns[i].id}
                         draggable
-                        onDragStart={() => dragStart(id)}
+                        onDragStart={() => dragStart(columns[i].id)}
                         onDragOver={(e) => {
                             e.preventDefault();
                             dragOver(e);
                         }}
-                      onDragLeave={() => dragLeave()}
-                      onDrop={() => drop(id)}
-                      onDragEnd={handleDragEnd}
-                      className="row"
-                      data-id={id}
-                    >
-                      {value}
-                    </tr>
+                        onDragLeave={() => dragLeave()}
+                        onDrop={() => drop(columns[i].id)}
+                        onDragEnd={handleDragEnd}
+                        className="col"
+                        data-id={columns[i].id}
+                        >
+                        {columns[i].value}
+                        </td>
 
 
-
-                    
-
-                ))
-                
-                }
-                </table>
-                </td>
-
-
-                <td className="col"> 
-                <table>
-                {
-
-                red.map(({ id, value }) => (
-                    
-
-
-                    <tr
-                        key={id}
+                        <td 
+                        key={columns[i+5].id}
                         draggable
-                        onDragStart={() => dragStart(id)}
+                        onDragStart={() => dragStart(columns[i+5].id)}
                         onDragOver={(e) => {
                             e.preventDefault();
                             dragOver(e);
                         }}
-                    onDragLeave={() => dragLeave()}
-                    onDrop={() => drop(id)}
-                    onDragEnd={handleDragEnd}
-                    className="row"
-                    data-id={id}
-                    >
-                    {value}
-                    </tr>
+                        onDragLeave={() => dragLeave()}
+                        onDrop={() => drop(columns[i+5].id)}
+                        onDragEnd={handleDragEnd}
+                        className="col"
+                        data-id={columns[i+5].id}
+                        >
+                        {columns[i+5].value}
+                        </td>
 
+                        </tr>
+                    ))
+                } 
 
-
-                    
-
-                ))
-
-                }
-                </table>
-                </td>
-                
-
-                </tr>
-
+              </tbody>
             </table>
 
         );
