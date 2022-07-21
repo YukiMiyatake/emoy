@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
+import Select from "react-select";
 
 const LaneName: string[] = ["Top", "Jg", "Mid", "Bot", "Sup"];
 
@@ -14,24 +15,20 @@ export type Props = Readonly<
   } & Omit<ComponentPropsWithoutRef<"p">, "className">
 >;
 
+const aquaticCreatures = [
+  { label: "Shark", value: "Shark" },
+  { label: "Dolphin", value: "Dolphin" },
+  { label: "Whale", value: "Whale" },
+  { label: "Octopus", value: "Octopus" },
+  { label: "Crab", value: "Crab" },
+  { label: "Lobster", value: "Lobster" },
+];
+
 export const LolColumn = (props: Props) => {
   return (
     <>
       <p className="container">{LaneName[props.index]}</p>
-      <select name="month">
-        <option value="jan">1月</option>
-        <option value="feb">2月</option>
-        <option value="mar">3月</option>
-        <option value="apr">4月</option>
-        <option value="may">5月</option>
-        <option value="jun">6月</option>
-        <option value="jul">7月</option>
-        <option value="aug">8月</option>
-        <option value="sep">9月</option>
-        <option value="oct">10月</option>
-        <option value="nov">11月</option>
-        <option value="dec">12月</option>
-      </select>
+      <Select options={aquaticCreatures} />
     </>
   );
 };

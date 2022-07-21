@@ -36,10 +36,10 @@ export const SwappableTable = forwardRef<HTMLDivElement, Props>(
 
     const dragOver = useMemo(() => {
       return throttle<DragEventHandler<HTMLElement>>((e) => {
-        if (!(e.target instanceof HTMLElement)) {
+        if (!(e.currentTarget instanceof HTMLElement)) {
           return;
         }
-        const { id } = e.target.dataset;
+        const { id } = e.currentTarget.dataset;
 
         if (id) {
           //changeOrder(dndState.draggedId, dndState.hoveredId);
@@ -59,58 +59,53 @@ export const SwappableTable = forwardRef<HTMLDivElement, Props>(
       };
     }, [dragOver]);
 
-
     return (
       <div className="container">
-        <div className="row"><div className="col text-primary">Blue</div>
-          <div className="col text-danger">Red</div></div>
+        <div className="row">
+          <div className="col text-primary">Blue</div>
+          <div className="col text-danger">Red</div>
+        </div>
 
-        {
-          [...Array(5)].map((_, i) => (
-
-            <div className="row" key={i + 100}>
-
-              <div className="col border border-primary"
-                key={columns[i].id}
-                draggable
-                onDragStart={() => dragStart(columns[i].id)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  dragOver(e);
-                }}
-                onDragLeave={() => dragLeave()}
-                onDrop={() => drop(columns[i].id)}
-                onDragEnd={handleDragEnd}
-                data-id={columns[i].id}
-              >
-                <LolColumn index={i}></LolColumn>
-                {columns[i].value}
-              </div>
-
-
-              <div className="col border border-danger"
-                key={columns[i + 5].id}
-                draggable
-                onDragStart={() => dragStart(columns[i + 5].id)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  dragOver(e);
-                }}
-                onDragLeave={() => dragLeave()}
-                onDrop={() => drop(columns[i + 5].id)}
-                onDragEnd={handleDragEnd}
-                data-id={columns[i + 5].id}
-              >
-                <LolColumn index={i}></LolColumn>
-                {columns[i + 5].value}
-              </div>
-
+        {[...Array(5)].map((_, i) => (
+          <div className="row" key={i + 100}>
+            <div
+              className="col border border-primary"
+              key={columns[i].id}
+              draggable
+              onDragStart={() => dragStart(columns[i].id)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                dragOver(e);
+              }}
+              onDragLeave={() => dragLeave()}
+              onDrop={() => drop(columns[i].id)}
+              onDragEnd={handleDragEnd}
+              data-id={columns[i].id}
+            >
+              <LolColumn index={i}></LolColumn>
+              {columns[i].value}
             </div>
-          ))
-        }
 
+            <div
+              className="col border border-danger"
+              key={columns[i + 5].id}
+              draggable
+              onDragStart={() => dragStart(columns[i + 5].id)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                dragOver(e);
+              }}
+              onDragLeave={() => dragLeave()}
+              onDrop={() => drop(columns[i + 5].id)}
+              onDragEnd={handleDragEnd}
+              data-id={columns[i + 5].id}
+            >
+              <LolColumn index={i}></LolColumn>
+              {columns[i + 5].value}
+            </div>
+          </div>
+        ))}
       </div>
-
     );
   }
 );
