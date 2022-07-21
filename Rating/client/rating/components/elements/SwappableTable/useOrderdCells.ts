@@ -25,7 +25,6 @@ export const useOrderedCells = (
       const fromIndex = columns.findIndex(({ id }) => id === fromId);
       const toIndex = columns.findIndex(({ id }) => id === toId);
 
-      // columns を desiredSort の順に並び替える
       const resultColumns = swap(columns, fromIndex, toIndex);
 
       // rows の中の配列を desiredSort の順に並び替える

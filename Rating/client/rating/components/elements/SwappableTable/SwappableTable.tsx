@@ -11,6 +11,7 @@ import { classnames } from "tailwindcss-classnames";
 
 import { useDnD } from "./useDnD";
 import { useOrderedCells } from "./useOrderdCells";
+import { LolColumn } from "../LolColumn";
 
 // 表示中身コンポーネント作成しなきゃ
 // 5vs5だけど汎用的にしたい
@@ -23,7 +24,7 @@ export type Props = Readonly<
   } & Omit<ComponentPropsWithoutRef<"div">, "className">
 >;
 
-export const SwappableTable = forwardRef<HTMLTableElement, Props>(
+export const SwappableTable = forwardRef<HTMLDivElement, Props>(
   (props, ref) => {
     const { columns, ...rest } = props;
 
@@ -82,6 +83,7 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
                 onDragEnd={handleDragEnd}
                 data-id={columns[i].id}
               >
+                <LolColumn index={i}></LolColumn>
                 {columns[i].value}
               </div>
 
@@ -99,6 +101,7 @@ export const SwappableTable = forwardRef<HTMLTableElement, Props>(
                 onDragEnd={handleDragEnd}
                 data-id={columns[i + 5].id}
               >
+                <LolColumn index={i}></LolColumn>
                 {columns[i + 5].value}
               </div>
 
