@@ -1,17 +1,17 @@
 {
   "files": {
-    "main.css": "/emoy/sent-holic/static/css/main.073c9b0a.css",
-    "main.js": "/emoy/sent-holic/static/js/main.c2de3abb.js",
-    "static/js/787.9eb971a4.chunk.js": "/emoy/sent-holic/static/js/787.9eb971a4.chunk.js",
-    "service-worker.js": "/emoy/sent-holic/service-worker.js",
-    "static/media/logo.svg": "/emoy/sent-holic/static/media/logo.103b5fa18196d5665a7e12318285c916.svg",
-    "index.html": "/emoy/sent-holic/index.html",
-    "main.073c9b0a.css.map": "/emoy/sent-holic/static/css/main.073c9b0a.css.map",
-    "main.c2de3abb.js.map": "/emoy/sent-holic/static/js/main.c2de3abb.js.map",
-    "787.9eb971a4.chunk.js.map": "/emoy/sent-holic/static/js/787.9eb971a4.chunk.js.map"
+    "main.css": "/emoy/static/css/main.073c9b0a.css",
+    "main.js": "/emoy/static/js/main.972ed6a1.js",
+    "static/js/787.9eb971a4.chunk.js": "/emoy/static/js/787.9eb971a4.chunk.js",
+    "service-worker.js": "/emoy/service-worker.js",
+    "static/media/logo.svg": "/emoy/static/media/logo.103b5fa18196d5665a7e12318285c916.svg",
+    "index.html": "/emoy/index.html",
+    "main.073c9b0a.css.map": "/emoy/static/css/main.073c9b0a.css.map",
+    "main.972ed6a1.js.map": "/emoy/static/js/main.972ed6a1.js.map",
+    "787.9eb971a4.chunk.js.map": "/emoy/static/js/787.9eb971a4.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.073c9b0a.css",
-    "static/js/main.c2de3abb.js"
+    "static/js/main.972ed6a1.js"
   ]
 }
