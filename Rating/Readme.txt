@@ -134,3 +134,25 @@ aws dynamodb update-item --endpoint-url http://localhost:8000 \
 }
 
 
+
+
+
+
+AOE2で考える？？
+
+
+Main
+--
+ID
+name  
+
+
+user
+---
+ID
+name    25
+mu      9
+sigma   12
+
+
+

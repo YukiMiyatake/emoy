@@ -2,8 +2,12 @@ import Head from "next/head";
 import Script from "next/script";
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
+import { useEffect } from "react";
 
 function MyApp({ Component, pageProps }: AppProps) {
+
+  useEffect(() => { /* アプリ起動時に1回だけの処理 */ }, []);
+
   return (
   <>
   <Head>
@@ -16,3 +20,5 @@ function MyApp({ Component, pageProps }: AppProps) {
 }
 
 export default MyApp
+
+
