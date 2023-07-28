@@ -34,7 +34,7 @@ export const Matching = forwardRef<HTMLDivElement, Props>(
             MatchUp
           </h1>
 
-        <SwappableTable {...props} />
+          <SwappableTable {...props} />
 
         </main>
 
