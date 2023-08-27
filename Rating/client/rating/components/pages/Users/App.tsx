@@ -11,7 +11,7 @@ const App = () => (
 
 
 
-  <Admin dataProvider={dataProvider}>
+  <Admin dataProvider={dataProvider}>aa
     <Resource name="posts" list={ListGuesser} />
     <Resource name="comments" list={ListGuesser} />
   </Admin>
