@@ -45,6 +45,7 @@ receipt_ios
 
 
 
+
 Gacha
 ガチャ確率テーブル
 10連ガチャ（1つSSR以上確定）
