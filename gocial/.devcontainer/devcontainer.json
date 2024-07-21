@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/alpine
 {
-	"name": "Django Sample",
+	"name": "Go Social",
 	
 	"dockerComposeFile": "docker-compose.yml",
 	
@@ -10,12 +10,12 @@
 	// VS Codeのワークスペースフォルダ
 	"workspaceFolder": "/workspace",
 	// 使用するサービス
-	"service": "web",
+	"service": "social",
 	"shutdownAction": "stopCompose",
 	"customizations": {
 		"vscode": {	
 			"extensions": [
-				"ms-python.python"
+				"golang.go"
 			]
 		}
 	},

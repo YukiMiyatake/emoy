@@ -13,4 +13,6 @@ EROレート、簡易ランク表示
 https://dev.classmethod.jp/articles/django-user-org-permission/
 
 
+てｓｔ
+
 ああ
