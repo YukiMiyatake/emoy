@@ -5,9 +5,9 @@
 
 
 
-import { useEffect } from 'react';
-import { getServerSideProps, ChampionListProps, ChampionProps } from './no-store/champions';
-import { ChampionDiv } from '@/components/client';
+import { useEffect, useState } from 'react';
+import { getServerSideProps, ChampionListProps, ChampionProps, ChampionData } from './no-store/champions';
+import { ChampionDiv, ChampionDivDisable, Reset, SetChampionData } from '@/components/client';
 
 // TODO: LatestのバージョンをAPIで取得し、WebStorageのバージョンと比較
 // バージョンが変わっていたら チャンピオン取得APIを呼び、WebStorageにチャンピオン名（英語、日本語）取得
@@ -28,67 +28,65 @@ import { ChampionDiv } from '@/components/client';
     status
 
   
+3
+*/
+
+/*
+サーバレンダリング：
+  バージョン取得
+  チャンピオンデータ一覧取得
+
+クライアントレンダリング
+　バージョン取得
+  localStorageから取得。なければチャンピオンデータを保存
 
 */
+
+
+
+
 
 const LOL_VERSION = '14.13.1';
 
 
-type Props = {champions: any}
+//type Props = {champions: any}
 
 
 
-
+export type ChampionIndexProps = {
+  champion: ChampionData,
+  index: number
+}
 
 
 function ChampionsPage( {champions}: ChampionListProps ) {
 
 // ComponentにわけてClinetServerわける
   //const [state, setState] = useState(champions);
-
+ // SetChampionData(champions);
   return (
+  <>
     <div>
-      {champions.map((champion, index) => (
-        <><a /><ChampionDiv champion={champion} /></>
-
-/*
-      
-
-        <div
-          //onClick={() => (() =>{champion.status = 1})()}  
-          key={champion.id} style={{ position: 'relative', display: 'inline-block'}}>
-          
-
-
-
-
-          <img 
-            src={`http://ddragon.leagueoflegends.com/cdn/${LOL_VERSION}/img/champion/${champion.image}`}
-            alt={champion.name} 
-            
-          />
-          
-          {
-            (() =>{
-              if (champion.status == 1) {
-                return (
-                  <img
-                    src={"maru.png"}
-                    style={{ position: 'absolute', top: 0, left: 0 }}
-                  />
-                );
-            }
-
-
-          })()
-        }
-        </div>
-*/
-
-      ))}
-    
+      <SetChampionData champions={champions} />
+      <Reset />
     </div>
 
+    <div>
+      Champion
+      <div>
+        {champions.map((champion, index) => (
+          <><ChampionDiv champion={champion} index={index} /></>
+        ))}
+      </div>
+
+      Disable
+      <div>
+        {champions.map((champion, index) => (
+          <><ChampionDivDisable champion={champion} index={index} /></>
+        ))}
+      </div>
+    </div>
+  </>
   );
 }
 
@@ -97,25 +95,9 @@ function ChampionsPage( {champions}: ChampionListProps ) {
 
 export default async function Home() {
   let champions = await getServerSideProps();
-/*
-  // LocalStorageからChampionPropsデータを取得する
-  // データが無い場合はgetServerSideProps()で取得する
-  
 
-  const getChampionPropsFromLocalStorage = () : ChampionListProps | null  =>{
-    const storedData = localStorage.getItem('championProps');
-    return storedData ? JSON.parse(storedData) : null;
-  };
+//  setChampionData(champions.props);
 
-  let champions: ChampionListProps | null = getChampionPropsFromLocalStorage();
-  if( !champions ) { champions = (await getServerSideProps()).props};
-
-  localStorage.setItem('championProps', JSON.stringify(champions));
-
-*/
-
-
- 
   return (
     ChampionsPage(champions.props)
   );

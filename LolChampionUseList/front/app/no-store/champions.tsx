@@ -10,6 +10,7 @@ export type ChampionData =
   name: string
   image: string
   status: number
+  display: boolean
 }
 
 export type ChampionProps = {
@@ -18,6 +19,7 @@ export type ChampionProps = {
 
 export type ChampionListProps = {
   champions: ChampionData[]
+  children?: React.ReactNode
 }
 
 
@@ -45,6 +47,7 @@ export async function getServerSideProps() {
         name: champion.name,
         image: champion.image.full,
         status: 0,
+        display: true,
       };
     }),
   };
