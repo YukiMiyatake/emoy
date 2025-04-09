@@ -1,0 +1,14 @@
+
+{
+  "TableName": "Players",
+  "KeySchema": [
+    { "AttributeName": "PlayerID", "KeyType": "HASH" }
+  ],
+  "AttributeDefinitions": [
+    { "AttributeName": "PlayerID", "AttributeType": "S" }
+  ],
+  "ProvisionedThroughput": {
+    "ReadCapacityUnits": 5,
+    "WriteCapacityUnits": 5
+  }
+}

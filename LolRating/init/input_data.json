@@ -1,0 +1,104 @@
+{
+    "Players": [
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "AAA" },
+            "Name": { "S": "AAA" },
+            "RatingMu": { "N": "25.0" },
+            "RatingSigma": { "N": "8.333" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "BBB" },
+            "Name": { "S": "BBB" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "CCC" },
+            "Name": { "S": "CCC" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "DDD" },
+            "Name": { "S": "DDD" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "EEE" },
+            "Name": { "S": "EEE" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "FFF" },
+            "Name": { "S": "FFF" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "GGG" },
+            "Name": { "S": "GGG" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "HHH" },
+            "Name": { "S": "HHH" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "III" },
+            "Name": { "S": "III" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        } 
+      },
+      {
+        "PutRequest": {
+          "Item": {
+            "PlayerID": { "S": "JJJ" },
+            "Name": { "S": "JJJ" },
+            "RatingMu": { "N": "27.0" },
+            "RatingSigma": { "N": "7.5" }
+          }
+        }
+      }
+    ]
+}
