@@ -21,7 +21,6 @@ const PlayerSelection: React.FC = () => {
     const parsedTeam2 = savedTeam2 ? JSON.parse(savedTeam2) : [];
     return [...parsedTeam2, ...Array(5 - parsedTeam2.length).fill(null)].slice(0, 5); // 5人未満の場合、null で埋める
   });
-  const [teamQuality, setTeamQuality] = useState<number | null>(null);
 
   useEffect(() => {
     const loadPlayers = async () => {
@@ -48,6 +47,35 @@ const PlayerSelection: React.FC = () => {
       newTeam2[index] = playerId;
       setTeam2(newTeam2);
     }
+  };
+
+  const handleAutoBalanceSelectedPlayers = () => {
+    // ドロップダウンで選択されたプレイヤーを取得
+    const selectedPlayerIds = [...team1, ...team2].filter((id): id is string => id !== null);
+    const selectedPlayers = players.filter(player => selectedPlayerIds.includes(player.PlayerID));
+
+    // プレイヤーをランダムにシャッフル
+    const shuffledPlayers = [...selectedPlayers].sort(() => Math.random() - 0.5);
+
+    // チームを初期化
+    let tempTeam1: Player[] = [];
+    let tempTeam2: Player[] = [];
+
+    shuffledPlayers.forEach(player => {
+      const team1MuSum = tempTeam1.reduce((sum, p) => sum + p.RatingMu, 0);
+      const team2MuSum = tempTeam2.reduce((sum, p) => sum + p.RatingMu, 0);
+
+      // ランダム性を持たせつつ、レートの合計が均等になるように振り分け
+      if (team1MuSum <= team2MuSum) {
+        tempTeam1.push(player);
+      } else {
+        tempTeam2.push(player);
+      }
+    });
+
+    // チームを更新
+    setTeam1(tempTeam1.map(player => player.PlayerID).slice(0, 5));
+    setTeam2(tempTeam2.map(player => player.PlayerID).slice(0, 5));
   };
 
   return (
@@ -94,6 +122,9 @@ const PlayerSelection: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+      <div style={{ marginTop: '20px' }}>
+        <button onClick={handleAutoBalanceSelectedPlayers}>選択されたプレイヤーを自動振り分け</button>
       </div>
     </div>
   );
