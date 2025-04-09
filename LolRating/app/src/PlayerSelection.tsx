@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPlayers } from './DynamoDBFunctions';
-import { TrueSkill, Rating, quality } from 'ts-trueskill'; // TrueSkill ライブラリをインポート
+import { TrueSkill, Rating, rate } from 'ts-trueskill'; // TrueSkill ライブラリをインポート
 
 type Player = {
   PlayerID: string;
@@ -49,7 +49,47 @@ const PlayerSelection: React.FC = () => {
     }
   };
 
-  const handleAutoBalanceSelectedPlayers = () => {
+  const handleTeamVictory = (winningTeam: 'team1' | 'team2') => {
+    if (!window.confirm(`${winningTeam === 'team1' ? 'チーム1' : 'チーム2'}が勝利しました。レートを更新しますか？`)) {
+      return;
+    }
+
+    // ドロップダウンで選択されたプレイヤーを取得
+    const team1Ratings = team1
+      .map(playerId => players.find(player => player.PlayerID === playerId))
+      .filter(Boolean)
+      .map(player => new Rating(player!.RatingMu, player!.RatingSigma));
+
+    const team2Ratings = team2
+      .map(playerId => players.find(player => player.PlayerID === playerId))
+      .filter(Boolean)
+      .map(player => new Rating(player!.RatingMu, player!.RatingSigma));
+
+    // 勝利チームに基づいてレートを更新
+    const [updatedTeam1Ratings, updatedTeam2Ratings] =
+      winningTeam === 'team1' ? rate([team1Ratings, team2Ratings]) : rate([team2Ratings, team1Ratings]);
+
+    // プレイヤーのレートを更新
+    const updatedPlayers = players.map(player => {
+      const team1Index = team1.indexOf(player.PlayerID);
+      if (team1Index !== -1) {
+        const updatedRating = updatedTeam1Ratings[team1Index];
+        return { ...player, RatingMu: updatedRating.mu, RatingSigma: updatedRating.sigma };
+      }
+
+      const team2Index = team2.indexOf(player.PlayerID);
+      if (team2Index !== -1) {
+        const updatedRating = updatedTeam2Ratings[team2Index];
+        return { ...player, RatingMu: updatedRating.mu, RatingSigma: updatedRating.sigma };
+      }
+
+      return player;
+    });
+
+    setPlayers(updatedPlayers);
+  };
+
+  const handleAutoBalanceTeams = () => {
     // ドロップダウンで選択されたプレイヤーを取得
     const selectedPlayerIds = [...team1, ...team2].filter((id): id is string => id !== null);
     const selectedPlayers = players.filter(player => selectedPlayerIds.includes(player.PlayerID));
@@ -124,7 +164,9 @@ const PlayerSelection: React.FC = () => {
         </div>
       </div>
       <div style={{ marginTop: '20px' }}>
-        <button onClick={handleAutoBalanceSelectedPlayers}>選択されたプレイヤーを自動振り分け</button>
+        <button onClick={() => handleTeamVictory('team1')}>チーム1勝利</button>
+        <button onClick={() => handleTeamVictory('team2')}>チーム2勝利</button>
+        <button onClick={handleAutoBalanceTeams}>チームを自動バランス</button>
       </div>
     </div>
   );
