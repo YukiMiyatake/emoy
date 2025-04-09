@@ -25,8 +25,28 @@ function saveChampionPropsToLocalStorage(champions: ChampionData[])
 };
 
 
+import { useEffect } from 'react';
 
-export function SetChampionData( {champions}: ChampionListProps) {
+export function SetChampionData({ champions }: ChampionListProps) {
+  const [champ, setChampions] = useState(champions);
+
+  useEffect(() => {
+    const c = getChampionPropsFromLocalStorage();
+    if (c) {
+      console.log("find");
+//      console.log(c);
+      setChampions([...c]);
+      console.log(champions);
+} else {
+      console.log("not found");
+      saveChampionPropsToLocalStorage(champions);
+    }
+  }, []);
+
+  return (<></>);
+}
+
+export function SetChampionData2( {champions}: ChampionListProps) {
   
   const [champ, setChampions] = useState(champions);
 
