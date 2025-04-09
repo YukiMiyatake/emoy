@@ -31,7 +31,7 @@ import { ChampionDiv, ChampionDivDisable, Reset, SetChampionData } from '@/compo
 3
 */
 
-/*
+/*s
 サーバレンダリング：
   バージョン取得
   チャンピオンデータ一覧取得
@@ -53,10 +53,7 @@ const LOL_VERSION = '14.13.1';
 
 
 
-export type ChampionIndexProps = {
-  champion: ChampionData,
-  index: number
-}
+
 
 
 function ChampionsPage( {champions}: ChampionListProps ) {
@@ -68,21 +65,21 @@ function ChampionsPage( {champions}: ChampionListProps ) {
   <>
     <div>
       <SetChampionData champions={champions} />
-      <Reset />
+      <Reset champions={champions}/>
     </div>
 
     <div>
       Champion
       <div>
         {champions.map((champion, index) => (
-          <><ChampionDiv champion={champion} index={index} /></>
+          <><ChampionDiv champions={[champion]} index={index} /></>
         ))}
       </div>
 
       Disable
       <div>
         {champions.map((champion, index) => (
-          <><ChampionDivDisable champion={champion} index={index} /></>
+          <><ChampionDivDisable champions={[champion]} index={index} /></>
         ))}
       </div>
     </div>

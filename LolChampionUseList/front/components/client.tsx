@@ -1,12 +1,12 @@
 'use client'
 
 import { ChampionData, ChampionListProps, ChampionProps } from '@/app/no-store/champions';
-import { ChampionIndexProps } from '@/app/page';
+
 import { MouseEventHandler, useState } from 'react';
 
 
-var championList : ChampionListProps;
-var hoge: ChampionData[];
+//var championList : ChampionListProps;
+//var hoge: ChampionData[];
 
   // LocalStorageからChampionPropsデータを取得する
   // データが無い場合はgetServerSideProps()で取得する
@@ -24,35 +24,41 @@ function saveChampionPropsToLocalStorage(champions: ChampionData[])
   localStorage.setItem('champions', JSON.stringify(champions));
 };
 
-export function SetChampionData( champions: ChampionListProps) {
+
+
+export function SetChampionData( {champions}: ChampionListProps) {
   
+  const [champ, setChampions] = useState(champions);
+
   const c = getChampionPropsFromLocalStorage();
   if( c ) {
     console.log("find");
     console.log(c)
 
     // ここでchampionListを更新する
-    championList = {champions: c};
+    setChampions(c); 
+    //championList = {champions: c};//////
 
   }else{
     console.log("not found");
-    saveChampionPropsToLocalStorage(champions.champions);
-    championList = champions;
+    saveChampionPropsToLocalStorage(champions);
+    //championList = champions;
   }
 
-  console.log(championList.champions[0]);
+  //console.log(championList.champions[0]);
   
-  return(<>{champions.children}</>);
-
+  return(<></>);
+ 
 }
 
 
 
-export function ChampionDiv( { index}: ChampionIndexProps) {
-  const champion = championList.champions[index];
+//export function ChampionDiv( { champion, index}: ChampionIndexProps) {
+export function ChampionDiv( { champions, index}: ChampionListProps) {
+  const champion = champions[index!];
 
-  const [status, setStatus] = useState(championList.champions[index].status);
-  const [display, setDisplay] = useState(championList.champions[index].display);
+  const [status, setStatus] = useState(champion.status);
+  const [display, setDisplay] = useState(champion.display);
   
 
   
@@ -62,14 +68,14 @@ export function ChampionDiv( { index}: ChampionIndexProps) {
       onClick={() => {
         const s: number = status === 0 ? 1 : 0;
         setStatus(s);
-        championList.champions[index].status = s;
-        saveChampionPropsToLocalStorage(championList.champions);
+        champion.status = s;
+        saveChampionPropsToLocalStorage(champions);
       }}
       // 右クリックしたら要素を非表示する
       onContextMenu={(e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
         setDisplay(false);
-        championList.champions[index].display = false;
-        saveChampionPropsToLocalStorage(championList.champions);
+        champion.display = false;
+        saveChampionPropsToLocalStorage(champions);
         e.preventDefault();
       }}
       key={champion.id}
@@ -101,8 +107,8 @@ export function ChampionDiv( { index}: ChampionIndexProps) {
 }
 
 
-export function ChampionDivDisable( {index}: ChampionIndexProps) {
-  const champion = championList.champions[index];
+export function ChampionDivDisable( {champions, index}: ChampionListProps) {
+  const champion = champions[index!];
 
   const [display, setDisplay] = useState(champion.display);
     
@@ -110,11 +116,10 @@ export function ChampionDivDisable( {index}: ChampionIndexProps) {
   return (
 
 <div
-onContextMenu={(e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+onContextMenu={() => {
   setDisplay(true);
-  championList.champions[index].display = true;
-  saveChampionPropsToLocalStorage(championList.champions);
-  e.preventDefault();
+  champion.display = true;
+  saveChampionPropsToLocalStorage(champions);
 }}
 key={champion.id}
 style={{ 
@@ -136,21 +141,27 @@ style={{
 
 
 
-export function Reset()
-{
+export function Reset({ champions }: ChampionListProps) {
+  // チャンピオンの状態をリセットする関数
+  const resetChampions = () => {
+    const resetChampions = champions.map((champion) => ({
+      ...champion,
+      status: 0, // すべてのチャンピオンのstatusを0にリセット
+      display: true, // displayをtrueに設定
+    }));
+
+    // 更新されたチャンピオンリストをローカルストレージに保存
+    saveChampionPropsToLocalStorage(resetChampions);
+
+    // 必要に応じて、状態管理のロジックをここに追加する
+    // 再レンダリング
+   // window.location.reload(); 
+    
+  };
 
   return (
-  <div       
-    onClick={() => {
-      championList.champions.forEach((champion) => {
-        champion.status = 0;
-        champion.display = true;
-      });
-      saveChampionPropsToLocalStorage(championList.champions);  
-      window.location.reload() 
-    }}
-  >
-    Reset
-  </div>
+    <div onClick={resetChampions}>
+      Reset
+    </div>
   );
 }

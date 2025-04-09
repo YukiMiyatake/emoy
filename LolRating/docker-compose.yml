@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./app:/app
+      #- /app/node_modules
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - dynamodb
+
+  dynamodb:
+    image: amazon/dynamodb-local
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/data
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "--cors", "*"]
+
+volumes:
+  dynamodb-data:

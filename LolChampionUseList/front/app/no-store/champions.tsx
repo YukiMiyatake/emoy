@@ -19,9 +19,14 @@ export type ChampionProps = {
 
 export type ChampionListProps = {
   champions: ChampionData[]
-  children?: React.ReactNode
+  index?: number; 
+  //children?: React.ReactNode
 }
 
+export type ChampionIndexProps = {
+//  champion: ChampionData,
+  index: number
+}
 
 async function getChampions() {
 
