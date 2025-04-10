@@ -49,16 +49,8 @@ const PlayerManagement: React.FC = () => {
   return (
     <div>
       <h1>プレイヤー管理画面</h1>
-      <h2>プレイヤー一覧</h2>
-      <ul>
-        {players.map((player) => (
-          <li key={player.PlayerID}>
-            {player.Name} (μ={player.RatingMu}, σ={player.RatingSigma})
-            <button onClick={() => handleEditPlayer(player)}>編集</button>
-            <button onClick={() => handleDeletePlayer(player.PlayerID)}>削除</button>
-          </li>
-        ))}
-      </ul>
+
+      {/* 新しいプレイヤー追加フォームを一番上に移動 */}
       <h2>新しいプレイヤーを追加</h2>
       <form
         onSubmit={(e) => {
@@ -83,6 +75,7 @@ const PlayerManagement: React.FC = () => {
         <button type="submit">追加</button>
       </form>
 
+      {/* 編集フォーム */}
       {editingPlayer && (
         <div>
           <h2>プレイヤーを編集</h2>
@@ -118,6 +111,34 @@ const PlayerManagement: React.FC = () => {
           </form>
         </div>
       )}
+
+      {/* プレイヤー一覧 */}
+      <h2>プレイヤー一覧</h2>
+      <table className="player-table">
+        <thead>
+          <tr>
+            <th>PlayerID</th>
+            <th>Name</th>
+            <th>μ</th>
+            <th>σ</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((player) => (
+            <tr key={player.PlayerID}>
+              <td>{player.PlayerID}</td>
+              <td>{player.Name}</td>
+              <td>{player.RatingMu.toFixed(2)}</td>
+              <td>{player.RatingSigma.toFixed(2)}</td>
+              <td>
+                <button onClick={() => handleEditPlayer(player)}>編集</button>
+                <button onClick={() => handleDeletePlayer(player.PlayerID)}>削除</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
