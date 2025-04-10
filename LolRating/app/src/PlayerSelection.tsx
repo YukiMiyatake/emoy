@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPlayers } from './DynamoDBFunctions';
-import { TrueSkill, Rating, rate } from 'ts-trueskill'; // TrueSkill ライブラリをインポート
+import { TrueSkill, Rating, rate, quality } from 'ts-trueskill'; // TrueSkill ライブラリをインポート
 
 type Player = {
   PlayerID: string;
@@ -22,6 +22,10 @@ const PlayerSelection: React.FC = () => {
     return [...parsedTeam2, ...Array(5 - parsedTeam2.length).fill(null)].slice(0, 5); // 5人未満の場合、null で埋める
   });
 
+  const [team1MuSum, setTeam1MuSum] = useState(0);
+  const [team2MuSum, setTeam2MuSum] = useState(0);
+  const [matchQuality, setMatchQuality] = useState(0);
+
   useEffect(() => {
     const loadPlayers = async () => {
       const fetchedPlayers = await fetchPlayers();
@@ -36,6 +40,32 @@ const PlayerSelection: React.FC = () => {
     localStorage.setItem('team1', JSON.stringify(team1));
     localStorage.setItem('team2', JSON.stringify(team2));
   }, [team1, team2]);
+
+  // チームのレート合計と勝利確率を計算
+  useEffect(() => {
+    const team1Ratings = team1
+      .map(playerId => players.find(player => player.PlayerID === playerId))
+      .filter(Boolean)
+      .map(player => new Rating(player!.RatingMu, player!.RatingSigma));
+
+    const team2Ratings = team2
+      .map(playerId => players.find(player => player.PlayerID === playerId))
+      .filter(Boolean)
+      .map(player => new Rating(player!.RatingMu, player!.RatingSigma));
+
+    const team1Mu = team1Ratings.reduce((sum, rating) => sum + rating.mu, 0);
+    const team2Mu = team2Ratings.reduce((sum, rating) => sum + rating.mu, 0);
+
+    setTeam1MuSum(team1Mu);
+    setTeam2MuSum(team2Mu);
+
+    if (team1Ratings.length === 5 && team2Ratings.length === 5) {
+      const qualityValue = quality([team1Ratings, team2Ratings]);
+      setMatchQuality(qualityValue);
+    } else {
+      setMatchQuality(0);
+    }
+  }, [team1, team2, players]);
 
   const handlePlayerSelect = (team: 'team1' | 'team2', index: number, playerId: string | null) => {
     if (team === 'team1') {
@@ -54,7 +84,6 @@ const PlayerSelection: React.FC = () => {
       return;
     }
 
-    // ドロップダウンで選択されたプレイヤーを取得
     const team1Ratings = team1
       .map(playerId => players.find(player => player.PlayerID === playerId))
       .filter(Boolean)
@@ -65,11 +94,9 @@ const PlayerSelection: React.FC = () => {
       .filter(Boolean)
       .map(player => new Rating(player!.RatingMu, player!.RatingSigma));
 
-    // 勝利チームに基づいてレートを更新
     const [updatedTeam1Ratings, updatedTeam2Ratings] =
       winningTeam === 'team1' ? rate([team1Ratings, team2Ratings]) : rate([team2Ratings, team1Ratings]);
 
-    // プレイヤーのレートを更新
     const updatedPlayers = players.map(player => {
       const team1Index = team1.indexOf(player.PlayerID);
       if (team1Index !== -1) {
@@ -90,39 +117,49 @@ const PlayerSelection: React.FC = () => {
   };
 
   const handleAutoBalanceTeams = () => {
-    // ドロップダウンで選択されたプレイヤーを取得
     const selectedPlayerIds = [...team1, ...team2].filter((id): id is string => id !== null);
     const selectedPlayers = players.filter(player => selectedPlayerIds.includes(player.PlayerID));
 
-    // プレイヤーをランダムにシャッフル
-    const shuffledPlayers = [...selectedPlayers].sort(() => Math.random() - 0.5);
+    if (selectedPlayers.length !== 10) {
+      alert('自動振り分けを行うには、10人のプレイヤーを選択してください。');
+      return;
+    }
 
-    // チームを初期化
-    let tempTeam1: Player[] = [];
-    let tempTeam2: Player[] = [];
+    let bestTeam1: Player[] = [];
+    let bestTeam2: Player[] = [];
+    let smallestRatingDifference = Infinity;
 
-    shuffledPlayers.forEach(player => {
+    for (let i = 0; i < 10; i++) {
+      const shuffledPlayers = [...selectedPlayers].sort(() => Math.random() - 0.5);
+      const tempTeam1 = shuffledPlayers.slice(0, 5);
+      const tempTeam2 = shuffledPlayers.slice(5, 10);
+
       const team1MuSum = tempTeam1.reduce((sum, p) => sum + p.RatingMu, 0);
       const team2MuSum = tempTeam2.reduce((sum, p) => sum + p.RatingMu, 0);
 
-      // ランダム性を持たせつつ、レートの合計が均等になるように振り分け
-      if (team1MuSum <= team2MuSum) {
-        tempTeam1.push(player);
-      } else {
-        tempTeam2.push(player);
-      }
-    });
+      const ratingDifference = Math.abs(team1MuSum - team2MuSum);
 
-    // チームを更新
-    setTeam1(tempTeam1.map(player => player.PlayerID).slice(0, 5));
-    setTeam2(tempTeam2.map(player => player.PlayerID).slice(0, 5));
+      if (ratingDifference < smallestRatingDifference) {
+        smallestRatingDifference = ratingDifference;
+        bestTeam1 = tempTeam1;
+        bestTeam2 = tempTeam2;
+      }
+    }
+
+    setTeam1(bestTeam1.map(player => player.PlayerID));
+    setTeam2(bestTeam2.map(player => player.PlayerID));
   };
 
   return (
     <div>
       <h1>5人対5人のプレイヤー選択</h1>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div>
+      <div className="match-info">
+        <p>チーム1のレート合計: {team1MuSum.toFixed(2)}</p>
+        <p>チーム2のレート合計: {team2MuSum.toFixed(2)}</p>
+        <p>マッチクオリティ: {(matchQuality * 100).toFixed(2)}%</p>
+      </div>
+      <div className="team-container">
+        <div className="team">
           <h2>チーム1</h2>
           {team1.map((playerId, index) => (
             <div key={index}>
@@ -142,7 +179,7 @@ const PlayerSelection: React.FC = () => {
             </div>
           ))}
         </div>
-        <div>
+        <div className="team">
           <h2>チーム2</h2>
           {team2.map((playerId, index) => (
             <div key={index}>
@@ -163,7 +200,7 @@ const PlayerSelection: React.FC = () => {
           ))}
         </div>
       </div>
-      <div style={{ marginTop: '20px' }}>
+      <div style={{ textAlign: 'center', marginTop: '20px' }}>
         <button onClick={() => handleTeamVictory('team1')}>チーム1勝利</button>
         <button onClick={() => handleTeamVictory('team2')}>チーム2勝利</button>
         <button onClick={handleAutoBalanceTeams}>チームを自動バランス</button>
