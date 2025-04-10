@@ -72,14 +72,14 @@ function ChampionsPage( {champions}: ChampionListProps ) {
       Champion
       <div>
         {champions.map((champion, index) => (
-          <><ChampionDiv champions={[champion]} index={index} /></>
+          <><ChampionDiv champions={champions} index={index} /></>
         ))}
       </div>
 
       Disable
       <div>
         {champions.map((champion, index) => (
-          <><ChampionDivDisable champions={[champion]} index={index} /></>
+          <><ChampionDivDisable champions={champions} index={index} /></>
         ))}
       </div>
     </div>
