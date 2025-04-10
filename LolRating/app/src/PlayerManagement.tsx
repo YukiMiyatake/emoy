@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPlayers, addPlayer, deletePlayer, updatePlayer } from './DynamoDBFunctions';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import './PlayerManagement.css';
 
 const PlayerManagement: React.FC = () => {
   const [players, setPlayers] = useState<any[]>([]);
   const [newPlayer, setNewPlayer] = useState({ PlayerID: '', Name: '', RatingMu: 25, RatingSigma: 8.333 });
-  const [editingPlayer, setEditingPlayer] = useState<any | null>(null); // 編集対象のプレイヤー
+  const [editingPlayer, setEditingPlayer] = useState<any | null>(null);
 
   // プレイヤーデータを取得
   useEffect(() => {
@@ -46,6 +48,10 @@ const PlayerManagement: React.FC = () => {
     }
   };
 
+  const handleCancelEdit = () => {
+    setEditingPlayer(null); // 編集モードを終了
+  };
+
   return (
     <div>
       <h1>プレイヤー管理画面</h1>
@@ -75,43 +81,6 @@ const PlayerManagement: React.FC = () => {
         <button type="submit">追加</button>
       </form>
 
-      {/* 編集フォーム */}
-      {editingPlayer && (
-        <div>
-          <h2>プレイヤーを編集</h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSaveEdit();
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Name"
-              value={editingPlayer.Name}
-              onChange={(e) => setEditingPlayer({ ...editingPlayer, Name: e.target.value })}
-              required
-            />
-            <input
-              type="number"
-              placeholder="RatingMu"
-              value={editingPlayer.RatingMu}
-              onChange={(e) => setEditingPlayer({ ...editingPlayer, RatingMu: parseFloat(e.target.value) })}
-              required
-            />
-            <input
-              type="number"
-              placeholder="RatingSigma"
-              value={editingPlayer.RatingSigma}
-              onChange={(e) => setEditingPlayer({ ...editingPlayer, RatingSigma: parseFloat(e.target.value) })}
-              required
-            />
-            <button type="submit">保存</button>
-            <button type="button" onClick={() => setEditingPlayer(null)}>キャンセル</button>
-          </form>
-        </div>
-      )}
-
       {/* プレイヤー一覧 */}
       <h2>プレイヤー一覧</h2>
       <table className="player-table">
@@ -129,7 +98,7 @@ const PlayerManagement: React.FC = () => {
             <tr key={player.PlayerID}>
               <td>{player.PlayerID}</td>
               <td>{player.Name}</td>
-              <td>{player.RatingMu.toFixed(2)}</td>
+              <td>{player.RatingMu.toFixed(0)}</td>
               <td>{player.RatingSigma.toFixed(2)}</td>
               <td>
                 <button onClick={() => handleEditPlayer(player)}>編集</button>
@@ -139,6 +108,48 @@ const PlayerManagement: React.FC = () => {
           ))}
         </tbody>
       </table>
+
+      {/* 編集ダイアログ */}
+      <Dialog open={!!editingPlayer} onClose={handleCancelEdit}>
+        <DialogTitle>プレイヤーを編集</DialogTitle>
+        <DialogContent>
+          {editingPlayer && (
+            <>
+              <TextField
+                label="Name"
+                value={editingPlayer.Name}
+                onChange={(e) => setEditingPlayer({ ...editingPlayer, Name: e.target.value })}
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="RatingMu"
+                type="number"
+                value={editingPlayer.RatingMu}
+                onChange={(e) => setEditingPlayer({ ...editingPlayer, RatingMu: parseFloat(e.target.value) })}
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="RatingSigma"
+                type="number"
+                value={editingPlayer.RatingSigma}
+                onChange={(e) => setEditingPlayer({ ...editingPlayer, RatingSigma: parseFloat(e.target.value) })}
+                fullWidth
+                margin="normal"
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelEdit} color="secondary">
+            キャンセル
+          </Button>
+          <Button onClick={handleSaveEdit} color="primary">
+            保存
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
