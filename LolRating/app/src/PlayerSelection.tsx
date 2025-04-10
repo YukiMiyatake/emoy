@@ -154,13 +154,11 @@ const PlayerSelection: React.FC = () => {
     <div>
       <h1>試合</h1>
       <div className="match-info">
-        <p>チーム1のレート合計: {team1MuSum.toFixed(2)}</p>
-        <p>チーム2のレート合計: {team2MuSum.toFixed(2)}</p>
         <p>マッチクオリティ: {(matchQuality * 100).toFixed(2)}%</p>
       </div>
       <div className="team-container">
         <div className="team">
-          <h2>チーム1</h2>
+          <h2>チーム1: {team1MuSum.toFixed(2)}</h2> 
           {team1.map((playerId, index) => (
             <div key={index}>
               <select
@@ -180,7 +178,7 @@ const PlayerSelection: React.FC = () => {
           ))}
         </div>
         <div className="team">
-          <h2>チーム2</h2>
+          <h2>チーム2: {team2MuSum.toFixed(2)}</h2>
           {team2.map((playerId, index) => (
             <div key={index}>
               <select
