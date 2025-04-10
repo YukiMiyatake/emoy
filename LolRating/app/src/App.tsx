@@ -9,10 +9,10 @@ const App: React.FC = () => {
 
   return (
     <div>
-      <h1>LoL 仲間内管理ツール</h1>
+      <h1>身内ランクツール</h1>
       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-        <Tab label="管理画面" />
-        <Tab label="プレイヤー選択" />
+        <Tab label="プレイヤー" />
+        <Tab label="試合登録" />
       </Tabs>
       {activeTab === 0 && <PlayerManagement />}
       {activeTab === 1 && <PlayerSelection />}

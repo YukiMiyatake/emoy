@@ -66,14 +66,14 @@ const PlayerManagement: React.FC = () => {
       >
         <input
           type="text"
-          placeholder="PlayerID"
+          placeholder="ID"
           value={newPlayer.PlayerID}
           onChange={(e) => setNewPlayer({ ...newPlayer, PlayerID: e.target.value })}
           required
         />
         <input
           type="text"
-          placeholder="Name"
+          placeholder="表示名"
           value={newPlayer.Name}
           onChange={(e) => setNewPlayer({ ...newPlayer, Name: e.target.value })}
           required
@@ -86,10 +86,10 @@ const PlayerManagement: React.FC = () => {
       <table className="player-table">
         <thead>
           <tr>
-            <th>PlayerID</th>
-            <th>Name</th>
-            <th>μ</th>
-            <th>σ</th>
+            <th>ID</th>
+            <th>表示名</th>
+            <th>ランク</th>
+            <th>不確定性</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -98,7 +98,7 @@ const PlayerManagement: React.FC = () => {
             <tr key={player.PlayerID}>
               <td>{player.PlayerID}</td>
               <td>{player.Name}</td>
-              <td>{player.RatingMu.toFixed(0)}</td>
+              <td>{player.RatingMu.toFixed(2)}</td>
               <td>{player.RatingSigma.toFixed(2)}</td>
               <td>
                 <button onClick={() => handleEditPlayer(player)}>編集</button>

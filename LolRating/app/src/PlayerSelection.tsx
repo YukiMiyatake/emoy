@@ -152,7 +152,7 @@ const PlayerSelection: React.FC = () => {
 
   return (
     <div>
-      <h1>5人対5人のプレイヤー選択</h1>
+      <h1>試合</h1>
       <div className="match-info">
         <p>チーム1のレート合計: {team1MuSum.toFixed(2)}</p>
         <p>チーム2のレート合計: {team2MuSum.toFixed(2)}</p>
