@@ -14,8 +14,8 @@ AWS.config.update({
 
 // DynamoDBクライアントを設定
 const dynamoDB = new AWS.DynamoDB.DocumentClient({
-  region: 'ap-northeast-1', // 例: 'ap-northeast-1'
-  endpoint: 'http://localhost:8000'
+  region: process.env.REACT_APP_AWS_REGION,
+  endpoint: process.env.REACT_APP_DYNAMODB_ENDPOINT || undefined, // 環境変数でエンドポイントを指定
 });
 
 
@@ -25,7 +25,7 @@ const dynamoDB = new AWS.DynamoDB.DocumentClient({
 // プレイヤー一覧を取得する関数
 export const fetchPlayers = async (): Promise<any[]> => {
   const params = {
-    TableName: 'Players',
+    TableName:  process.env.REACT_APP_PLAYERS_TABLE_NAME || 'Players', // 環境変数でテーブル名を指定
   };
 
   try {
@@ -40,7 +40,7 @@ export const fetchPlayers = async (): Promise<any[]> => {
 // プレイヤーを追加する関数
 export const addPlayer = async (player: { PlayerID: string; Name: string; RatingMu: number; RatingSigma: number }) => {
   const params = {
-    TableName: 'Players',
+    TableName:  process.env.REACT_APP_PLAYERS_TABLE_NAME || 'Players', // 環境変数でテーブル名を指定
     Item: player,
   };
 
@@ -54,7 +54,7 @@ export const addPlayer = async (player: { PlayerID: string; Name: string; Rating
 // プレイヤーを削除する関数
 export const deletePlayer = async (playerID: string) => {
   const params = {
-    TableName: 'Players',
+    TableName:  process.env.REACT_APP_PLAYERS_TABLE_NAME || 'Players', // 環境変数でテーブル名を指定
     Key: {
       PlayerID: playerID,
     },
@@ -70,7 +70,7 @@ export const deletePlayer = async (playerID: string) => {
 // プレイヤーを編集する関数
 export const updatePlayer = async (player: { PlayerID: string; Name: string; RatingMu: number; RatingSigma: number }) => {
   const params = {
-    TableName: 'Players',
+    TableName:  process.env.REACT_APP_PLAYERS_TABLE_NAME || 'Players', // 環境変数でテーブル名を指定
     Key: {
       PlayerID: player.PlayerID,
     },
