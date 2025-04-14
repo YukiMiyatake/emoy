@@ -32,7 +32,6 @@ export default function ChampionCard({
         cursor: 'pointer',
       }}
       onClick={() => {
-        console.log('Card clicked');
         onToggleDialog();
       }}
     >
@@ -65,31 +64,44 @@ export default function ChampionCard({
           style={{
             position: 'absolute',
             top: '110%',
-            left: 0,
-            background: 'white',
-            border: '1px solid black',
-            padding: '10px',
-            zIndex: 1000, // ダイアログを最前面に表示
-            filter: 'none',
+            left: '0',
+            background: 'white', // 背景色
+            border: '1px solid #ccc', // 枠線
+            borderRadius: '8px', // 角丸
+            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', // 影
+            padding: '15px', // 内側の余白
+            zIndex: 1000, // 最前面に表示
+            animation: 'fadeIn 0.3s ease-in-out', // アニメーション
           }}
         >
           {Object.keys(champion.tags).map((tag) => (
-            <div key={tag}>
+            <div key={tag} style={{ marginBottom: '5px' }}>
               <label>
                 <input
                   type="checkbox"
                   checked={champion.tags[tag]}
                   onChange={() => toggleTag(tag)}
+                  style={{ 
+                    marginRight: '5px',
+                  }}
                 />
-                {tag}
+                <span style={{color: tag==='Live' ? 'red' : 'black' }}>{tag}</span>
               </label>
             </div>
           ))}
           <button
             onClick={(e) => {
               e.stopPropagation(); // クリックイベントの伝播を防ぐ
-              console.log('Close clicked');
-              onToggleDialog();
+              onToggleDialog(); // ダイアログを閉じる
+            }}
+            style={{
+              marginTop: '10px',
+              padding: '5px 10px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
             }}
           >
             閉じる
