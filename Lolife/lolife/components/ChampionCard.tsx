@@ -4,12 +4,19 @@ import { useState } from 'react';
 
 export default function ChampionCard({
   champion,
+  isOpen,
+
+  onToggleDialog,
   onUpdate,
+
 }: {
   champion: any;
+  isOpen: boolean;
+  onToggleDialog: () => void;
   onUpdate: (champion: any) => void;
 }) {
-  const [showDialog, setShowDialog] = useState(false);
+
+  //const [showDialog, setShowDialog] = useState(false);
 
   const toggleTag = (tag: string) => {
     const updatedTags = { ...champion.tags, [tag]: !champion.tags[tag] };
@@ -26,7 +33,7 @@ export default function ChampionCard({
       }}
       onClick={() => {
         console.log('Card clicked');
-        setShowDialog(true);
+        onToggleDialog();
       }}
     >
       <img
@@ -34,7 +41,6 @@ export default function ChampionCard({
         alt={champion.name}
         style={{
           filter: champion.tags.Live ? 'none' : 'grayscale(100%)',
-
           width: '100%',
           height: '100%',
         }}
@@ -53,7 +59,7 @@ export default function ChampionCard({
           }}
         />
       )}
-      {showDialog && (
+      {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()} // クリックイベントの伝播を防ぐ
           style={{
@@ -83,7 +89,7 @@ export default function ChampionCard({
             onClick={(e) => {
               e.stopPropagation(); // クリックイベントの伝播を防ぐ
               console.log('Close clicked');
-              setShowDialog(false);
+              onToggleDialog();
             }}
           >
             閉じる

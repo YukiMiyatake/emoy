@@ -6,6 +6,11 @@ import ChampionCard from './ChampionCard'; // Ensure ChampionCard.tsx or Champio
 export default function ChampionList({ champions }: { champions: any[] }) {
   const [storedChampions, setStoredChampions] = useState<any[]>([]);
   const [filters, setFilters] = useState<string[]>([]);
+  const [openDialogId, setOpenDialogId] = useState<string | null>(null);
+
+  const handleDialogToggle = (id: string | null) => {
+    setOpenDialogId(id); // 現在開いているダイアログのIDを設定
+  };
 
   useEffect(() => {
     const savedChampions = localStorage.getItem('champions');
@@ -48,6 +53,11 @@ export default function ChampionList({ champions }: { champions: any[] }) {
               setStoredChampions(updatedChampions);
               localStorage.setItem('champions', JSON.stringify(updatedChampions));
             }}
+            isOpen={openDialogId === champion.id} // ダイアログが開いているかどうかを判定
+            onToggleDialog={() =>
+              handleDialogToggle(openDialogId === champion.id ? null : champion.id)
+            }
+  
           />
         ))}
       </div>
