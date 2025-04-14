@@ -94,13 +94,13 @@ export default function ChampionList({ champions }: { champions: any[] }) {
               cursor: 'pointer',
             }}
           >
-            {tag}{' '}
+            {tag !== 'Live'? tag+' '  :''}
             {tag === 'Live'
               ? filters.Live === 'True'
-                ? '✓ True'
+                ? 'Live'
                 : filters.Live === 'False'
-                ? '✓ False'
-                : '✓ Both'
+                ? 'Death'
+                : 'Champion'
               : filters[tag]
               ? '✓'
               : ''}
