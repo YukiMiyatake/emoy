@@ -26,6 +26,7 @@ export default function ChampionList({ champions }: { champions: any[] }) {
     setFilters((prev) =>
       prev.includes(tag) ? prev.filter((f) => f !== tag) : [...prev, tag]
     );
+    setOpenDialogId(null); // フィルターボタンを押したときにダイアログを閉じる
   };
 
   const filteredChampions = storedChampions.filter((champion) =>
@@ -36,7 +37,19 @@ export default function ChampionList({ champions }: { champions: any[] }) {
     <div>
       <div>
         {['Live', 'Top', 'Jg', 'Mid', 'Bot', 'Sup'].map((tag) => (
-          <button key={tag} onClick={() => toggleFilter(tag)}>
+          <button
+            key={tag}
+            onClick={() => toggleFilter(tag)}
+            style={{
+              backgroundColor: filters.includes(tag) ? '#4CAF50' : '#f0f0f0', // トグル状態に応じて色を変更
+              color: filters.includes(tag) ? 'white' : 'black', // テキスト色も変更
+              border: '1px solid #ccc',
+              padding: '5px 10px',
+              margin: '5px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+            }}
+          >
             {tag} {filters.includes(tag) ? '✓' : ''}
           </button>
         ))}
