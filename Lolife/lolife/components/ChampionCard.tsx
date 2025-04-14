@@ -40,6 +40,7 @@ export default function ChampionCard({
         alt={champion.name}
         style={{
           filter: champion.tags.Live ? 'none' : 'grayscale(100%)',
+          border: champion.tags.Live ? '0px' : '4px groove #000000',
           width: '100%',
           height: '100%',
         }}
