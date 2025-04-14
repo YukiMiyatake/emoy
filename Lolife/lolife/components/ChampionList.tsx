@@ -1,3 +1,5 @@
+/* eslint @typescript-eslint/no-explicit-any: 0 */
+
 'use client';
 
 import { useEffect, useState } from 'react';
