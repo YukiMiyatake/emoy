@@ -36,7 +36,7 @@ export default function ChampionCard({
       }}
     >
       <img
-        src={`https://ddragon.leagueoflegends.com/cdn/14.13.1/img/champion/${champion.image}`}
+        src={`https://ddragon.leagueoflegends.com/cdn/15.7.1/img/champion/${champion.image}`}
         alt={champion.name}
         style={{
           filter: champion.tags.Live ? 'none' : 'grayscale(100%)',

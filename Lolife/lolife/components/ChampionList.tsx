@@ -17,10 +17,30 @@ export default function ChampionList({ champions }: { champions: any[] }) {
   useEffect(() => {
     const savedChampions = localStorage.getItem('champions');
     if (savedChampions) {
-      setStoredChampions(JSON.parse(savedChampions));
+      const localChampions = JSON.parse(savedChampions);
+
+      // マージ処理: APIから取得したチャンピオンとローカルのチャンピオンを比較
+      const localChampionIds = new Set(localChampions.map((champion: any) => champion.id));
+      const newChampions = champions.filter((champion: any) => !localChampionIds.has(champion.id));
+      const mergedChampions = [...localChampions, ...newChampions];
+
+      // 名前でソート
+      const sortedChampions = mergedChampions.sort((a: any, b: any) =>
+        a.name.localeCompare(b.name)
+      );
+
+      setStoredChampions(sortedChampions);
+
+      // マージ後のデータをlocalStorageに保存
+      localStorage.setItem('champions', JSON.stringify(sortedChampions));
     } else {
-      setStoredChampions(champions);
-      localStorage.setItem('champions', JSON.stringify(champions));
+      // 名前でソート
+      const sortedChampions = champions.sort((a: any, b: any) =>
+        a.name.localeCompare(b.name)
+      );
+
+      setStoredChampions(sortedChampions);
+      localStorage.setItem('champions', JSON.stringify(sortedChampions));
     }
   }, [champions]);
 
@@ -80,15 +100,15 @@ export default function ChampionList({ champions }: { champions: any[] }) {
                   ? '#4CAF50'
                   : '#f0f0f0', // トグル状態に応じて色を変更
               color:
-              tag === 'Live'
-              ? filters.Live === 'True'
-                ? 'white'
-                : filters.Live === 'False'
-                ? 'white'
-                : 'black'
-              : filters[tag]
-              ? 'white'
-              : 'black', // トグル状態に応じて色を変更
+                tag === 'Live'
+                  ? filters.Live === 'True'
+                    ? 'white'
+                    : filters.Live === 'False'
+                    ? 'white'
+                    : 'black'
+                  : filters[tag]
+                  ? 'white'
+                  : 'black', // トグル状態に応じて色を変更
               border: '1px solid #ccc',
               padding: '5px 10px',
               margin: '5px',
@@ -96,7 +116,7 @@ export default function ChampionList({ champions }: { champions: any[] }) {
               cursor: 'pointer',
             }}
           >
-            {tag !== 'Live'? tag+' '  :''}
+            {tag !== 'Live' ? tag + ' ' : ''}
             {tag === 'Live'
               ? filters.Live === 'True'
                 ? 'Live'

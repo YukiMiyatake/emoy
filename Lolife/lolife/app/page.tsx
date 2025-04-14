@@ -2,7 +2,7 @@
 import axios from 'axios';
 import ChampionList from '../components/ChampionList';
 
-const LOL_VERSION = '14.13.1';
+const LOL_VERSION = '15.7.1';
 
 // チャンピオンデータの型定義
 type Champion = {
@@ -30,7 +30,38 @@ async function fetchChampions(): Promise<Champion[]> {
   }));
 }
 
+function mergeChampions(localChampions: Champion[], fetchedChampions: Champion[]): Champion[] {
+  const localChampionIds = new Set(localChampions.map((champion) => champion.id));
+  const newChampions = fetchedChampions.filter((champion) => !localChampionIds.has(champion.id));
+  return [...localChampions, ...newChampions];
+}
+
 export default async function Page() {
-  const champions: Champion[] = await fetchChampions();
+  const fetchedChampions: Champion[] = await fetchChampions();
+  // localStorageからデータを取得
+  const savedChampions = typeof window !== 'undefined' ? localStorage.getItem('champions') : null;
+  let champions: Champion[] = fetchedChampions;
+
+console.log("fetchd:" + fetchedChampions[1].name);
+console.log("saved:" + savedChampions);
+
+  if (savedChampions) {
+    const localChampions: Champion[] = JSON.parse(savedChampions);
+    console.log("localChampion[1]" + localChampions[1].name);
+    
+    champions = mergeChampions(localChampions, fetchedChampions);
+    console.log("mergeChampions[1]" + champions[1].name);
+
+    // 更新されたデータをlocalStorageに保存
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('champions', JSON.stringify(champions));
+    }
+  } else {
+    // 初回ロード時にlocalStorageに保存
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('champions', JSON.stringify(fetchedChampions));
+    }
+  }
+
   return <ChampionList champions={champions} />;
 }
