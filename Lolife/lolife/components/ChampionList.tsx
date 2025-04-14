@@ -45,13 +45,18 @@ export default function ChampionList({ champions }: { champions: any[] }) {
       if (filters.Live === 'True' && !champion.tags.Live) return false;
       if (filters.Live === 'False' && champion.tags.Live) return false;
     }
-    // 他のフィルターの処理
-    return Object.keys(filters).every(
-      (filter) =>
-        filter === 'Live' || // Liveは特別処理済み
-        filters[filter] === false || // フィルターが無効ならスキップ
-        champion.tags[filter]
-    );
+
+    // Top, Jg, Mid, Bot, Supのフィルター処理 (or条件)
+    const roleFilters = ['Top', 'Jg', 'Mid', 'Bot', 'Sup'];
+    const activeRoleFilters = roleFilters.filter((role) => filters[role]);
+    if (activeRoleFilters.length > 0) {
+      // いずれかのフィルターが有効で、チャンピオンがそのタグを持たない場合は除外
+      if (!activeRoleFilters.some((role) => champion.tags[role])) {
+        return false;
+      }
+    }
+
+    return true; // フィルター条件をすべて満たす場合
   });
 
   return (
@@ -73,11 +78,15 @@ export default function ChampionList({ champions }: { champions: any[] }) {
                   ? '#4CAF50'
                   : '#f0f0f0', // トグル状態に応じて色を変更
               color:
-                tag === 'Live' && filters.Live === 'Both'
-                  ? 'black'
-                  : filters[tag] || filters.Live === 'True' || filters.Live === 'False'
-                  ? 'white'
-                  : 'black', // テキスト色も変更
+              tag === 'Live'
+              ? filters.Live === 'True'
+                ? 'white'
+                : filters.Live === 'False'
+                ? 'white'
+                : 'black'
+              : filters[tag]
+              ? 'white'
+              : 'black', // トグル状態に応じて色を変更
               border: '1px solid #ccc',
               padding: '5px 10px',
               margin: '5px',
