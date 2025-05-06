@@ -74,6 +74,39 @@ export default function ChampionList({ champions }: { champions: any[] }) {
     localStorage.setItem('champions', JSON.stringify(updatedChampions));
   };
 
+  const setRandomChoicedFromEnabled = () => {
+    const enabledChampions = storedChampions.filter((champion) => champion.tags.Live);
+
+    if (enabledChampions.length < randomCount) {
+      alert('Enabled状態のチャンピオンがランダム選択数より少ないです。');
+      return;
+    }
+
+    if (!window.confirm(`${randomCount}個のEnabledチャンピオンをランダムでChoiceに設定しますか？`)) {
+      return;
+    }
+
+    const updatedChampions = storedChampions.map((champion) => ({
+      ...champion,
+      tags: { ...champion.tags, Choiced: false },
+    }));
+
+    const randomIndexes = Array.from({ length: randomCount }, () =>
+      Math.floor(Math.random() * enabledChampions.length)
+    );
+
+    randomIndexes.forEach((index) => {
+      const championId = enabledChampions[index].id;
+      const targetChampion = updatedChampions.find((c) => c.id === championId);
+      if (targetChampion) {
+        targetChampion.tags.Choiced = true;
+      }
+    });
+
+    setStoredChampions(updatedChampions);
+    localStorage.setItem('champions', JSON.stringify(updatedChampions));
+  };
+
   const filteredChampions = storedChampions.filter((champion) => {
     if (filters.Live) {
       if (filters.Live === 'True' && !champion.tags.Live) return false;
@@ -160,9 +193,23 @@ export default function ChampionList({ champions }: { champions: any[] }) {
             border: 'none',
             borderRadius: '5px',
             cursor: 'pointer',
+            marginRight: '10px',
           }}
         >
           ランダムChoice
+        </button>
+        <button
+          onClick={() => setRandomChoicedFromEnabled()}
+          style={{
+            padding: '5px 10px',
+            backgroundColor: '#28A745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+          }}
+        >
+          EnabledからランダムChoice
         </button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
