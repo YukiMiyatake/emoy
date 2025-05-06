@@ -2,6 +2,7 @@
 
 'use client';
 
+import React from 'react';
 import { useEffect, useState } from 'react';
 import ChampionCard from './ChampionCard';
 
@@ -9,36 +10,28 @@ export default function ChampionList({ champions }: { champions: any[] }) {
   const [storedChampions, setStoredChampions] = useState<any[]>([]);
   const [filters, setFilters] = useState<{ [key: string]: string | boolean }>({});
   const [openDialogId, setOpenDialogId] = useState<string | null>(null);
+  const [randomCount, setRandomCount] = useState<number>(5); // ランダム選択数
 
   const handleDialogToggle = (id: string | null) => {
-    setOpenDialogId(id); // 現在開いているダイアログのIDを設定
+    setOpenDialogId(id);
   };
 
   useEffect(() => {
     const savedChampions = localStorage.getItem('champions');
     if (savedChampions) {
       const localChampions = JSON.parse(savedChampions);
-
-      // マージ処理: APIから取得したチャンピオンとローカルのチャンピオンを比較
       const localChampionIds = new Set(localChampions.map((champion: any) => champion.id));
       const newChampions = champions.filter((champion: any) => !localChampionIds.has(champion.id));
       const mergedChampions = [...localChampions, ...newChampions];
-
-      // 名前でソート
       const sortedChampions = mergedChampions.sort((a: any, b: any) =>
         a.name.localeCompare(b.name)
       );
-
       setStoredChampions(sortedChampions);
-
-      // マージ後のデータをlocalStorageに保存
       localStorage.setItem('champions', JSON.stringify(sortedChampions));
     } else {
-      // 名前でソート
       const sortedChampions = champions.sort((a: any, b: any) =>
         a.name.localeCompare(b.name)
       );
-
       setStoredChampions(sortedChampions);
       localStorage.setItem('champions', JSON.stringify(sortedChampions));
     }
@@ -47,44 +40,66 @@ export default function ChampionList({ champions }: { champions: any[] }) {
   const toggleFilter = (tag: string) => {
     setFilters((prev) => {
       if (tag === 'Live') {
-        // Liveフィルターの状態を切り替える
         const currentState = prev.Live;
-        if (currentState === 'True') return { ...prev, Live: 'False' }; // True -> False
-        if (currentState === 'False') return { ...prev, Live: 'Both' }; // False -> Both
-        return { ...prev, Live: 'True' }; // Both -> True
+        if (currentState === 'True') return { ...prev, Live: 'False' };
+        if (currentState === 'False') return { ...prev, Live: 'Both' };
+        return { ...prev, Live: 'True' };
       }
-      // 他のフィルターは通常のトグル
       return prev[tag]
         ? { ...prev, [tag]: false }
         : { ...prev, [tag]: true };
     });
-    setOpenDialogId(null); // フィルターボタンを押したときにダイアログを閉じる
+    setOpenDialogId(null);
+  };
+
+  const setRandomChoiced = () => {
+    if (!window.confirm(`${randomCount}個のチャンピオンをランダムでChoiceに設定しますか？`)) {
+      return;
+    }
+
+    const updatedChampions = storedChampions.map((champion) => ({
+      ...champion,
+      tags: { ...champion.tags, Choiced: false },
+    }));
+
+    const randomIndexes = Array.from({ length: randomCount }, () =>
+      Math.floor(Math.random() * updatedChampions.length)
+    );
+
+    randomIndexes.forEach((index) => {
+      updatedChampions[index].tags.Choiced = true;
+    });
+
+    setStoredChampions(updatedChampions);
+    localStorage.setItem('champions', JSON.stringify(updatedChampions));
   };
 
   const filteredChampions = storedChampions.filter((champion) => {
-    // Liveフィルターの処理
     if (filters.Live) {
       if (filters.Live === 'True' && !champion.tags.Live) return false;
       if (filters.Live === 'False' && champion.tags.Live) return false;
     }
 
-    // Top, Jg, Mid, Bot, Supのフィルター処理 (or条件)
     const roleFilters = ['Top', 'Jg', 'Mid', 'Bot', 'Sup'];
     const activeRoleFilters = roleFilters.filter((role) => filters[role]);
     if (activeRoleFilters.length > 0) {
-      // いずれかのフィルターが有効で、チャンピオンがそのタグを持たない場合は除外
       if (!activeRoleFilters.some((role) => champion.tags[role])) {
         return false;
       }
     }
 
-    return true; // フィルター条件をすべて満たす場合
+    // Choiced の AND 条件
+    if (filters.Choiced && !champion.tags.Choiced) {
+      return false;
+    }
+
+    return true;
   });
 
   return (
     <div>
       <div>
-        {['Live', 'Top', 'Jg', 'Mid', 'Bot', 'Sup'].map((tag) => (
+        {['Live', 'Top', 'Jg', 'Mid', 'Bot', 'Sup', 'Choiced'].map((tag) => (
           <button
             key={tag}
             onClick={() => toggleFilter(tag)}
@@ -98,7 +113,7 @@ export default function ChampionList({ champions }: { champions: any[] }) {
                     : '#f0f0f0'
                   : filters[tag]
                   ? '#4CAF50'
-                  : '#f0f0f0', // トグル状態に応じて色を変更
+                  : '#f0f0f0',
               color:
                 tag === 'Live'
                   ? filters.Live === 'True'
@@ -108,7 +123,7 @@ export default function ChampionList({ champions }: { champions: any[] }) {
                     : 'black'
                   : filters[tag]
                   ? 'white'
-                  : 'black', // トグル状態に応じて色を変更
+                  : 'black',
               border: '1px solid #ccc',
               padding: '5px 10px',
               margin: '5px',
@@ -129,6 +144,27 @@ export default function ChampionList({ champions }: { champions: any[] }) {
           </button>
         ))}
       </div>
+      <div style={{ margin: '10px 0' }}>
+        <input
+          type="number"
+          value={randomCount}
+          onChange={(e) => setRandomCount(Number(e.target.value))}
+          style={{ marginRight: '10px', padding: '5px', width: '50px' }}
+        />
+        <button
+          onClick={setRandomChoiced}
+          style={{
+            padding: '5px 10px',
+            backgroundColor: '#007BFF',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+          }}
+        >
+          ランダムChoice
+        </button>
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
         {filteredChampions.map((champion) => (
           <ChampionCard
@@ -141,7 +177,7 @@ export default function ChampionList({ champions }: { champions: any[] }) {
               setStoredChampions(updatedChampions);
               localStorage.setItem('champions', JSON.stringify(updatedChampions));
             }}
-            isOpen={openDialogId === champion.id} // ダイアログが開いているかどうかを判定
+            isOpen={openDialogId === champion.id}
             onToggleDialog={() =>
               handleDialogToggle(openDialogId === champion.id ? null : champion.id)
             }

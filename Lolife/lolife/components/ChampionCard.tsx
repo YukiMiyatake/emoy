@@ -77,18 +77,20 @@ export default function ChampionCard({
           }}
         >
           {Object.keys(champion.tags).map((tag) => (
-            <div key={tag} style={{ marginBottom: '5px' }}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={champion.tags[tag]}
-                  onChange={() => toggleTag(tag)}
-                  style={{ 
-                    marginRight: '5px',
-                  }}
-                />
-                <span style={{color: tag==='Live' ? 'red' : 'black' }}>{tag}</span>
-              </label>
+            <div
+              key={tag}
+              onClick={() => toggleTag(tag)} // クリックでタグの状態を切り替え
+              style={{
+                marginBottom: '2px',
+                padding: '5px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                backgroundColor: champion.tags[tag] ? '#4CAF50' : '#FF5722', // ON/OFFで色を変更
+                color: 'white',
+                textAlign: 'center',
+              }}
+            >
+              {tag}
             </div>
           ))}
           <button
