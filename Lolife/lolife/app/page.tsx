@@ -1,8 +1,8 @@
 /* eslint @typescript-eslint/no-explicit-any: 0 */
 import axios from 'axios';
+import { CHAMPION_URL } from '../constants';
 import ChampionList from '../components/ChampionList';
 
-const LOL_VERSION = '15.7.1';
 
 // チャンピオンデータの型定義
 type Champion = {
@@ -20,7 +20,7 @@ type Champion = {
 };
 
 async function fetchChampions(): Promise<Champion[]> {
-  const url = `https://ddragon.leagueoflegends.com/cdn/${LOL_VERSION}/data/en_US/champion.json`;
+  const url = `${CHAMPION_URL}`;
   const response = await axios.get(url);
   return Object.values(response.data.data).map((champion: any) => ({
     id: champion.key,

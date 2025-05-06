@@ -1,6 +1,7 @@
 /* eslint @typescript-eslint/no-explicit-any: 0 */
 
 'use client';
+import { CHAMPION_IMAGE_URL } from '../constants';
 
 export default function ChampionCard({
   champion,
@@ -36,7 +37,7 @@ export default function ChampionCard({
       }}
     >
       <img
-        src={`https://ddragon.leagueoflegends.com/cdn/15.7.1/img/champion/${champion.image}`}
+        src={`${CHAMPION_IMAGE_URL}${champion.image}`}
         alt={champion.name}
         style={{
           filter: champion.tags.Live ? 'none' : 'grayscale(100%)',
