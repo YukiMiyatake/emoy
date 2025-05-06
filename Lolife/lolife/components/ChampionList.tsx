@@ -107,6 +107,20 @@ export default function ChampionList({ champions }: { champions: any[] }) {
     localStorage.setItem('champions', JSON.stringify(updatedChampions));
   };
 
+  const setAllEnabledTrue = () => {
+    if (!window.confirm('全てのチャンピオンをEnabledに設定しますか？')) {
+      return;
+    }
+
+    const updatedChampions = storedChampions.map((champion) => ({
+      ...champion,
+      tags: { ...champion.tags, Live: true },
+    }));
+
+    setStoredChampions(updatedChampions);
+    localStorage.setItem('champions', JSON.stringify(updatedChampions));
+  };
+
   const filteredChampions = storedChampions.filter((champion) => {
     if (filters.Live) {
       if (filters.Live === 'True' && !champion.tags.Live) return false;
@@ -207,9 +221,23 @@ export default function ChampionList({ champions }: { champions: any[] }) {
             border: 'none',
             borderRadius: '5px',
             cursor: 'pointer',
+            marginRight: '10px',
           }}
         >
           EnabledからランダムChoice
+        </button>
+        <button
+          onClick={() => setAllEnabledTrue()}
+          style={{
+            padding: '5px 10px',
+            backgroundColor: '#FFC107',
+            color: 'black',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+          }}
+        >
+          全てEnabledに設定
         </button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
