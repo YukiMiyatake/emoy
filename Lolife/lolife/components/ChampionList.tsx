@@ -1,61 +1,50 @@
-/* eslint @typescript-eslint/no-explicit-any: 0 */
-
 'use client';
 
-import React from 'react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ChampionCard from './ChampionCard';
 
-export default function ChampionList({ champions }: { champions: any[] }) {
-  const [storedChampions, setStoredChampions] = useState<any[]>([]);
-  const [filters, setFilters] = useState<{ [key: string]: string | boolean }>({});
-  const [openDialogId, setOpenDialogId] = useState<string | null>(null);
-  const [randomCount, setRandomCount] = useState<number>(5); // ランダム選択数
+type Champion = {
+  id: string;
+  name: string;
+  image: string;
+  tags: { [key: string]: boolean };
+};
 
-  const handleDialogToggle = (id: string | null) => {
-    setOpenDialogId(id);
-  };
+type ChampionListProps = {
+  champions: Champion[];
+};
+
+export default function ChampionList({ champions }: ChampionListProps) {
+  const [storedChampions, setStoredChampions] = useState<Champion[]>([]);
+  const [filters, setFilters] = useState<{ [key: string]: boolean }>({});
+  const [openDialogId, setOpenDialogId] = useState<string | null>(null);
+  const [randomCount, setRandomCount] = useState<number>(5);
 
   useEffect(() => {
-    const savedChampions = localStorage.getItem('champions');
-    if (savedChampions) {
-      const localChampions = JSON.parse(savedChampions);
-      const localChampionIds = new Set(localChampions.map((champion: any) => champion.id));
-      const newChampions = champions.filter((champion: any) => !localChampionIds.has(champion.id));
-      const mergedChampions = [...localChampions, ...newChampions];
-      const sortedChampions = mergedChampions.sort((a: any, b: any) =>
-        a.name.localeCompare(b.name)
-      );
-      setStoredChampions(sortedChampions);
-      localStorage.setItem('champions', JSON.stringify(sortedChampions));
-    } else {
-      const sortedChampions = champions.sort((a: any, b: any) =>
-        a.name.localeCompare(b.name)
-      );
-      setStoredChampions(sortedChampions);
-      localStorage.setItem('champions', JSON.stringify(sortedChampions));
+    if (typeof window !== 'undefined') {
+      const savedChampions = localStorage.getItem('champions');
+      if (savedChampions) {
+        setStoredChampions(JSON.parse(savedChampions));
+      } else {
+        setStoredChampions(champions);
+        localStorage.setItem('champions', JSON.stringify(champions));
+      }
     }
   }, [champions]);
 
   const toggleFilter = (tag: string) => {
-    setFilters((prev) => {
-      if (tag === 'Live') {
-        const currentState = prev.Live;
-        if (currentState === 'True') return { ...prev, Live: 'False' };
-        if (currentState === 'False') return { ...prev, Live: 'Both' };
-        return { ...prev, Live: 'True' };
-      }
-      return prev[tag]
-        ? { ...prev, [tag]: false }
-        : { ...prev, [tag]: true };
-    });
-    setOpenDialogId(null);
+    setFilters((prev) => ({ ...prev, [tag]: !prev[tag] }));
+  };
+
+  const updateChampions = (updatedChampions: Champion[]) => {
+    setStoredChampions(updatedChampions);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('champions', JSON.stringify(updatedChampions));
+    }
   };
 
   const setRandomChoiced = () => {
-    if (!window.confirm(`${randomCount}個のチャンピオンをランダムでChoiceに設定しますか？`)) {
-      return;
-    }
+    if (!window.confirm(`${randomCount}個のチャンピオンをランダムでChoiceに設定しますか？`)) return;
 
     const updatedChampions = storedChampions.map((champion) => ({
       ...champion,
@@ -70,8 +59,7 @@ export default function ChampionList({ champions }: { champions: any[] }) {
       updatedChampions[index].tags.Choiced = true;
     });
 
-    setStoredChampions(updatedChampions);
-    localStorage.setItem('champions', JSON.stringify(updatedChampions));
+    updateChampions(updatedChampions);
   };
 
   const setRandomChoicedFromEnabled = () => {
@@ -103,45 +91,54 @@ export default function ChampionList({ champions }: { champions: any[] }) {
       }
     });
 
-    setStoredChampions(updatedChampions);
-    localStorage.setItem('champions', JSON.stringify(updatedChampions));
+    updateChampions(updatedChampions);
   };
 
   const setAllEnabledTrue = () => {
-    if (!window.confirm('全てのチャンピオンをEnabledに設定しますか？')) {
-      return;
-    }
+    if (!window.confirm('全てのチャンピオンをEnabledに設定しますか？')) return;
 
     const updatedChampions = storedChampions.map((champion) => ({
       ...champion,
       tags: { ...champion.tags, Live: true },
     }));
 
-    setStoredChampions(updatedChampions);
-    localStorage.setItem('champions', JSON.stringify(updatedChampions));
+    updateChampions(updatedChampions);
   };
 
   const filteredChampions = storedChampions.filter((champion) => {
-    if (filters.Live) {
-      if (filters.Live === 'True' && !champion.tags.Live) return false;
-      if (filters.Live === 'False' && champion.tags.Live) return false;
-    }
-
-    const roleFilters = ['Top', 'Jg', 'Mid', 'Bot', 'Sup'];
-    const activeRoleFilters = roleFilters.filter((role) => filters[role]);
-    if (activeRoleFilters.length > 0) {
-      if (!activeRoleFilters.some((role) => champion.tags[role])) {
-        return false;
-      }
-    }
-
-    // Choiced の AND 条件
-    if (filters.Choiced && !champion.tags.Choiced) {
-      return false;
-    }
-
-    return true;
+    return Object.keys(filters).every((key) => !filters[key] || champion.tags[key]);
   });
+
+  const styles = {
+    button: (isActive: boolean) => ({
+      backgroundColor: isActive ? '#4CAF50' : '#f0f0f0',
+      color: isActive ? 'white' : 'black',
+      border: '1px solid #ccc',
+      padding: '5px 10px',
+      margin: '5px',
+      borderRadius: '5px',
+      cursor: 'pointer',
+    }),
+    input: {
+      marginRight: '10px',
+      padding: '5px',
+      width: '50px',
+    },
+    actionButton: (bgColor: string, textColor: string) => ({
+      padding: '5px 10px',
+      backgroundColor: bgColor,
+      color: textColor,
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      marginRight: '10px',
+    }),
+    championContainer: {
+      display: 'flex',
+      flexWrap: 'wrap' as React.CSSProperties['flexWrap'],
+      gap: '10px',
+    },
+  };
 
   return (
     <div>
@@ -150,44 +147,9 @@ export default function ChampionList({ champions }: { champions: any[] }) {
           <button
             key={tag}
             onClick={() => toggleFilter(tag)}
-            style={{
-              backgroundColor:
-                tag === 'Live'
-                  ? filters.Live === 'True'
-                    ? '#4CAF50'
-                    : filters.Live === 'False'
-                    ? '#FF5722'
-                    : '#f0f0f0'
-                  : filters[tag]
-                  ? '#4CAF50'
-                  : '#f0f0f0',
-              color:
-                tag === 'Live'
-                  ? filters.Live === 'True'
-                    ? 'white'
-                    : filters.Live === 'False'
-                    ? 'white'
-                    : 'black'
-                  : filters[tag]
-                  ? 'white'
-                  : 'black',
-              border: '1px solid #ccc',
-              padding: '5px 10px',
-              margin: '5px',
-              borderRadius: '5px',
-              cursor: 'pointer',
-            }}
+            style={styles.button(filters[tag])}
           >
-            {tag !== 'Live' ? tag + ' ' : ''}
-            {tag === 'Live'
-              ? filters.Live === 'True'
-                ? 'Live'
-                : filters.Live === 'False'
-                ? 'Death'
-                : 'Champion'
-              : filters[tag]
-              ? '✓'
-              : ''}
+            {tag}
           </button>
         ))}
       </div>
@@ -195,52 +157,32 @@ export default function ChampionList({ champions }: { champions: any[] }) {
         <input
           type="number"
           value={randomCount}
-          onChange={(e) => setRandomCount(Number(e.target.value))}
-          style={{ marginRight: '10px', padding: '5px', width: '50px' }}
+          onChange={(e) => {
+            const value = Number(e.target.value);
+            if (!isNaN(value)) setRandomCount(value);
+          }}
+          style={styles.input}
         />
         <button
           onClick={setRandomChoiced}
-          style={{
-            padding: '5px 10px',
-            backgroundColor: '#007BFF',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
+          style={styles.actionButton('#007BFF', 'white')}
         >
           ランダムChoice
         </button>
         <button
-          onClick={() => setRandomChoicedFromEnabled()}
-          style={{
-            padding: '5px 10px',
-            backgroundColor: '#28A745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
+          onClick={setRandomChoicedFromEnabled}
+          style={styles.actionButton('#28A745', 'white')}
         >
           EnabledからランダムChoice
         </button>
         <button
-          onClick={() => setAllEnabledTrue()}
-          style={{
-            padding: '5px 10px',
-            backgroundColor: '#FFC107',
-            color: 'black',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-          }}
+          onClick={setAllEnabledTrue}
+          style={styles.actionButton('#FFC107', 'black')}
         >
           全てEnabledに設定
         </button>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+      <div style={styles.championContainer}>
         {filteredChampions.map((champion) => (
           <ChampionCard
             key={champion.id}
@@ -249,12 +191,11 @@ export default function ChampionList({ champions }: { champions: any[] }) {
               const updatedChampions = storedChampions.map((c) =>
                 c.id === updatedChampion.id ? updatedChampion : c
               );
-              setStoredChampions(updatedChampions);
-              localStorage.setItem('champions', JSON.stringify(updatedChampions));
+              updateChampions(updatedChampions);
             }}
             isOpen={openDialogId === champion.id}
             onToggleDialog={() =>
-              handleDialogToggle(openDialogId === champion.id ? null : champion.id)
+              setOpenDialogId(openDialogId === champion.id ? null : champion.id)
             }
           />
         ))}
