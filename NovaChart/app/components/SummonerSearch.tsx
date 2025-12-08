@@ -373,34 +373,51 @@ export default function SummonerSearch() {
 
       // Save rate history to database
       if (result.rateHistory && result.rateHistory.length > 0) {
-        const { addRateHistory } = useAppStore.getState();
+        const { addRateHistory, rateHistory: currentRateHistory } = useAppStore.getState();
         let addedCount = 0;
         let updatedCount = 0;
-        const existingCount = useAppStore.getState().rateHistory.length;
+        let failedCount = 0;
+        
+        // Create a map of existing entries by date (same day) for comparison
+        const existingByDate = new Map<string, number>();
+        currentRateHistory.forEach(entry => {
+          const entryDate = new Date(entry.date);
+          const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
+          existingByDate.set(dateKey, (existingByDate.get(dateKey) || 0) + 1);
+        });
         
         for (const entry of result.rateHistory) {
           try {
-            const beforeCount = useAppStore.getState().rateHistory.length;
+            const entryDate = new Date(entry.date);
+            const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
+            const existedBefore = existingByDate.has(dateKey);
+            
             await addRateHistory({
-              date: new Date(entry.date),
+              date: entryDate,
               tier: entry.tier,
               rank: entry.rank,
               lp: entry.lp,
               wins: entry.wins,
               losses: entry.losses,
             });
-            const afterCount = useAppStore.getState().rateHistory.length;
-            if (afterCount > beforeCount) {
-              addedCount++;
-            } else {
+            
+            // Reload state to get accurate count
+            await useAppStore.getState().loadRateHistory();
+            
+            // Check if entry was added or updated based on whether it existed before
+            if (existedBefore) {
               updatedCount++;
+            } else {
+              addedCount++;
+              existingByDate.set(dateKey, 1);
             }
           } catch (error) {
+            failedCount++;
             console.error('[SummonerSearch] Error saving rate history entry:', error);
           }
         }
         
-        console.log(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated`);
+        console.log(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed`);
       }
 
       // Update current league entry

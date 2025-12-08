@@ -54,6 +54,7 @@ export const rateHistoryService = {
       // Update existing entry instead of adding duplicate
       console.log('[RateHistoryService] Duplicate entry found for date:', rateDate.toISOString(), 'Updating existing entry');
       await db.rateHistory.update(existing.id!, {
+        date: rate.date, // Update date to reflect the latest capture time
         tier: rate.tier,
         rank: rate.rank,
         lp: rate.lp,

@@ -13,7 +13,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { tierRankToLP } from '@/lib/riot/client';
+import { tierRankToLP, lpToTierRank } from '@/lib/riot/client';
 import { calculateMovingAverage, generatePredictionPoints } from '@/lib/analytics/prediction';
 import { Goal, RateHistory } from '@/types';
 
@@ -71,7 +71,7 @@ export default function RateChart() {
 
   const chartData = useMemo(() => {
     if (filteredRateHistory.length === 0) {
-      return [];
+      return { data: [], yAxisDomain: [0, 2800], yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800] };
     }
 
     // Sort by date (oldest first)
@@ -134,10 +134,70 @@ export default function RateChart() {
     // Remove dateTime before returning (not needed for chart)
     const finalData = combined.map(({ dateTime, originalEntry, ...rest }) => rest);
     
+    // Calculate Y-axis domain (min and max LP values)
+    const lpValues = finalData
+      .map(d => d.lp)
+      .filter(lp => !isNaN(lp));
+    
+    if (lpValues.length === 0) {
+      return { data: finalData, yAxisDomain: [0, 2800], yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800] };
+    }
+    
+    const minLP = Math.min(...lpValues);
+    const maxLP = Math.max(...lpValues);
+    const range = maxLP - minLP;
+    
+    // Calculate appropriate padding (10% of range, minimum 50)
+    const padding = Math.max(50, range * 0.1);
+    
+    // Round down min and round up max to nearest 50 for cleaner display
+    const roundedMin = Math.floor((minLP - padding) / 50) * 50;
+    const roundedMax = Math.ceil((maxLP + padding) / 50) * 50;
+    
+    const yAxisDomain = [Math.max(0, roundedMin), roundedMax];
+    
+    // Generate Y-axis ticks based on data range
+    const generateYTicks = () => {
+      const ticks: number[] = [];
+      const domainRange = roundedMax - roundedMin;
+      
+      // Determine tick interval based on range
+      let tickInterval: number;
+      if (domainRange <= 200) {
+        tickInterval = 25; // Small range: every 25 LP
+      } else if (domainRange <= 500) {
+        tickInterval = 50; // Medium range: every 50 LP
+      } else if (domainRange <= 1000) {
+        tickInterval = 100; // Large range: every 100 LP (rank boundaries)
+      } else {
+        tickInterval = 200; // Very large range: every 200 LP
+      }
+      
+      // Generate ticks at appropriate intervals
+      let currentTick = Math.ceil(roundedMin / tickInterval) * tickInterval;
+      while (currentTick <= roundedMax) {
+        ticks.push(currentTick);
+        currentTick += tickInterval;
+      }
+      
+      // Ensure we have at least 3 ticks
+      if (ticks.length < 3) {
+        const midPoint = (roundedMin + roundedMax) / 2;
+        ticks.push(Math.round(midPoint / tickInterval) * tickInterval);
+        ticks.sort((a, b) => a - b);
+      }
+      
+      return ticks;
+    };
+    
+    const yAxisTicks = generateYTicks();
+    
     console.log('[RateChart] Final chart data points:', finalData.length);
+    console.log('[RateChart] Y-axis domain:', yAxisDomain);
+    console.log('[RateChart] Y-axis ticks:', yAxisTicks);
     console.log('[RateChart] Sample data:', finalData.slice(0, 3));
     
-    return finalData;
+    return { data: finalData, yAxisDomain, yAxisTicks };
   }, [filteredRateHistory, goals]);
 
   if (rateHistory.length === 0) {
@@ -193,10 +253,55 @@ export default function RateChart() {
         </p>
       )}
       <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <LineChart data={chartData.data} margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
-          <YAxis />
+          <YAxis 
+            domain={chartData.yAxisDomain}
+            ticks={chartData.yAxisTicks}
+            tickFormatter={(value: number) => {
+              if (isNaN(value)) return '';
+              const tierRank = lpToTierRank(value);
+              
+              // Master tier and above - show as is
+              if (tierRank.tier === 'MASTER' || tierRank.tier === 'GRANDMASTER' || tierRank.tier === 'CHALLENGER') {
+                return tierRank.tier;
+              }
+              
+              // Convert tier names to English
+              const tierNames: Record<string, string> = {
+                'IRON': 'Iron',
+                'BRONZE': 'Bronze',
+                'SILVER': 'Silver',
+                'GOLD': 'Gold',
+                'PLATINUM': 'Platinum',
+                'EMERALD': 'Emerald',
+                'DIAMOND': 'Diamond',
+              };
+              
+              const tierName = tierNames[tierRank.tier] || tierRank.tier;
+              
+              // Convert rank numbers (IV=4, III=3, II=2, I=1)
+              const rankNumbers: Record<string, string> = {
+                'IV': '4',
+                'III': '3',
+                'II': '2',
+                'I': '1',
+              };
+              
+              const rankNumber = rankNumbers[tierRank.rank] || '';
+              
+              // Only show if rank exists (don't show tier only)
+              if (rankNumber && tierRank.lp < 5) {
+                return `${tierName} ${rankNumber}`;
+              }
+              
+              // If no rank, return empty string to hide the tick
+              return '';
+            }}
+            width={90}
+            allowDecimals={false}
+          />
           <Tooltip
             formatter={(value: number, name: string, props: any) => {
               if (isNaN(value)) return 'N/A';
