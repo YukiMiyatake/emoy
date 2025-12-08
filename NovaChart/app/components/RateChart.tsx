@@ -111,17 +111,13 @@ export default function RateChart() {
       };
     });
 
-    // Add goal line
-    const activeGoal = goals.find((g) => g.isActive);
-    if (activeGoal) {
-      const goalLP = tierRankToLP(activeGoal.targetTier, activeGoal.targetRank, activeGoal.targetLP);
-      dataPoints.forEach((point) => {
-        point.goalLP = goalLP;
-      });
-      predictionPoints.forEach((point) => {
-        point.goalLP = goalLP;
-      });
-    }
+    // Add goal lines for all goals
+    // Store goal data separately for rendering multiple goal lines
+    const goalData = goals.map(goal => ({
+      goal,
+      goalLP: tierRankToLP(goal.targetTier, goal.targetRank, goal.targetLP),
+      targetDate: new Date(goal.targetDate).getTime(),
+    })).sort((a, b) => a.targetDate - b.targetDate);
 
     // Combine and sort by dateTime
     const combined = [...dataPoints, ...predictionPoints].sort((a, b) => a.dateTime - b.dateTime);
@@ -133,11 +129,18 @@ export default function RateChart() {
     const now = Date.now();
     let xAxisDomain: [number, number];
     
+    // Find the latest goal date
+    const latestGoalDate = goalData.length > 0 
+      ? Math.max(...goalData.map(g => g.targetDate))
+      : null;
+    
     if (timeRange === 'all') {
-      // Show all data
+      // Show all data, extending to latest goal date if it exists
       const minDate = finalData.length > 0 ? Math.min(...finalData.map(d => d.dateValue)) : now;
       const maxDate = finalData.length > 0 ? Math.max(...finalData.map(d => d.dateValue)) : now;
-      xAxisDomain = [minDate, maxDate];
+      // Extend to latest goal date if it's later than maxDate
+      const extendedMaxDate = latestGoalDate && latestGoalDate > maxDate ? latestGoalDate : maxDate;
+      xAxisDomain = [minDate, extendedMaxDate];
     } else {
       // Calculate start date based on time range
       let startDate: number;
@@ -164,8 +167,12 @@ export default function RateChart() {
       
       // Set domain to show from startDate to now (or data max, whichever is later)
       // But ensure we show at least the filtered data range
+      // Also extend to latest goal date if it exists
       const domainStart = Math.min(startDate, dataMinDate);
-      const domainEnd = Math.max(now, dataMaxDate);
+      let domainEnd = Math.max(now, dataMaxDate);
+      if (latestGoalDate && latestGoalDate > domainEnd) {
+        domainEnd = latestGoalDate;
+      }
       
       xAxisDomain = [domainStart, domainEnd];
     }
@@ -294,6 +301,7 @@ export default function RateChart() {
       xAxisDomain,
       brushStartIndex: brushStart,
       brushEndIndex: brushEnd,
+      goalData,
     };
   }, [rateHistory, goals, timeRange, movingAverageWindow]);
 
@@ -459,16 +467,42 @@ export default function RateChart() {
             dot={false}
             connectNulls={false}
           />
-          <Line
-            type="monotone"
-            dataKey="goalLP"
-            stroke="#ef4444"
-            strokeWidth={2}
-            strokeDasharray="10 5"
-            name="目標"
-            dot={false}
-            connectNulls={false}
-          />
+          {chartData.goalData.map((goalItem, index) => {
+            // Find the data point closest to the goal date
+            let closestDateStr = '';
+            let minDiff = Infinity;
+            
+            chartData.data.forEach(d => {
+              const diff = Math.abs(d.dateValue - goalItem.targetDate);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestDateStr = d.date;
+              }
+            });
+            
+            // If no data point found, create a date string from goal date
+            if (!closestDateStr) {
+              const goalDate = new Date(goalItem.targetDate);
+              closestDateStr = `${goalDate.getMonth() + 1}/${goalDate.getDate()}`;
+            }
+            
+            return (
+              <ReferenceLine
+                key={goalItem.goal.id || index}
+                x={closestDateStr}
+                y={goalItem.goalLP}
+                stroke="#ef4444"
+                strokeWidth={2}
+                strokeDasharray="10 5"
+                label={{
+                  value: `${goalItem.goal.targetTier} ${goalItem.goal.targetRank} ${goalItem.goal.targetLP}LP`,
+                  position: 'top',
+                  fill: '#ef4444',
+                  fontSize: 12,
+                }}
+              />
+            );
+          })}
           <Brush
             dataKey="date"
             height={30}

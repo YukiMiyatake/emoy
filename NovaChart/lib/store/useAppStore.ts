@@ -17,6 +17,8 @@ interface AppState {
   clearRateHistory: () => Promise<void>;
   loadGoals: () => Promise<void>;
   addGoal: (goal: Omit<Goal, 'id'>) => Promise<void>;
+  updateGoal: (id: number, changes: Partial<Goal>) => Promise<void>;
+  deleteGoal: (id: number) => Promise<void>;
   loadMatches: () => Promise<void>;
   addMatch: (match: Omit<Match, 'id'>) => Promise<void>;
   setCurrentSummoner: (summoner: Summoner | null) => void;
@@ -95,6 +97,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to add goal',
+        isLoading: false,
+      });
+    }
+  },
+
+  updateGoal: async (id, changes) => {
+    try {
+      set({ isLoading: true, error: null });
+      await goalService.update(id, changes);
+      await get().loadGoals();
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to update goal',
+        isLoading: false,
+      });
+    }
+  },
+
+  deleteGoal: async (id) => {
+    try {
+      set({ isLoading: true, error: null });
+      await goalService.delete(id);
+      await get().loadGoals();
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to delete goal',
         isLoading: false,
       });
     }

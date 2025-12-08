@@ -94,8 +94,7 @@ export const goalService = {
   },
 
   async add(goal: Omit<Goal, 'id'>): Promise<number> {
-    // Deactivate all existing goals
-    await db.goals.where('isActive').equals(true).modify({ isActive: false });
+    // Allow multiple active goals - don't deactivate existing goals
     return await db.goals.add(goal as Goal);
   },
 
