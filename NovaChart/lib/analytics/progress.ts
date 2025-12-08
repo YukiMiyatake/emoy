@@ -1,6 +1,90 @@
 import { RateHistory, Goal, Match } from '@/types';
 import { tierRankToLP, lpToTierRank } from '@/lib/riot/client';
 
+/**
+ * Calculate time-weighted win rate from rate history
+ * More recent entries have higher weight
+ */
+function calculateTimeWeightedWinRate(rateHistory: RateHistory[]): number {
+  if (rateHistory.length === 0) {
+    return 0.5; // Default 50%
+  }
+
+  const sorted = [...rateHistory].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const now = Date.now();
+  const firstDate = new Date(sorted[0].date).getTime();
+  const timeRange = now - firstDate;
+
+  if (timeRange === 0) {
+    // All entries are at the same time, use simple average
+    const totalWins = sorted.reduce((sum, r) => sum + r.wins, 0);
+    const totalLosses = sorted.reduce((sum, r) => sum + r.losses, 0);
+    const totalGames = totalWins + totalLosses;
+    return totalGames > 0 ? totalWins / totalGames : 0.5;
+  }
+
+  // Calculate weighted wins and losses
+  let weightedWins = 0;
+  let weightedLosses = 0;
+
+  for (const entry of sorted) {
+    const entryTime = new Date(entry.date).getTime();
+    // Weight: more recent = higher weight (linear decay)
+    // Weight ranges from 0.1 (oldest) to 1.0 (newest)
+    const age = (now - entryTime) / timeRange; // 0 (newest) to 1 (oldest)
+    const weight = 0.1 + (1 - age) * 0.9; // Linear weight from 0.1 to 1.0
+    
+    weightedWins += entry.wins * weight;
+    weightedLosses += entry.losses * weight;
+  }
+
+  const totalWeightedGames = weightedWins + weightedLosses;
+  return totalWeightedGames > 0 ? weightedWins / totalWeightedGames : 0.5;
+}
+
+/**
+ * Calculate time-weighted win rate from matches
+ * More recent matches have higher weight
+ */
+function calculateTimeWeightedWinRateFromMatches(matches: Match[]): number {
+  if (matches.length === 0) {
+    return 0.5; // Default 50%
+  }
+
+  const now = Date.now();
+  const firstDate = new Date(matches[0].date).getTime();
+  const timeRange = now - firstDate;
+
+  if (timeRange === 0) {
+    // All matches are at the same time, use simple average
+    const wins = matches.filter((m) => m.win).length;
+    return wins / matches.length;
+  }
+
+  // Calculate weighted wins and losses
+  let weightedWins = 0;
+  let weightedLosses = 0;
+
+  for (const match of matches) {
+    const matchTime = new Date(match.date).getTime();
+    // Weight: more recent = higher weight
+    const age = (now - matchTime) / timeRange; // 0 (newest) to 1 (oldest)
+    const weight = 0.1 + (1 - age) * 0.9; // Linear weight from 0.1 to 1.0
+    
+    if (match.win) {
+      weightedWins += weight;
+    } else {
+      weightedLosses += weight;
+    }
+  }
+
+  const totalWeightedGames = weightedWins + weightedLosses;
+  return totalWeightedGames > 0 ? weightedWins / totalWeightedGames : 0.5;
+}
+
 export interface ProgressResult {
   currentLP: number;
   targetLP: number;
@@ -196,24 +280,28 @@ export function calculateRequiredMatches(
     };
   }
 
-  // Calculate win rate from currentLeagueEntry (solo queue only) if available
+  // Calculate win rate with time-weighted average (more recent data has higher weight)
   let winRate = 0.5; // Default 50%
+  
   if (isSoloQueue && currentLeagueEntry && currentLeagueEntry.wins !== undefined && currentLeagueEntry.losses !== undefined) {
+    // Use currentLeagueEntry if available, but also consider recent rate history for better accuracy
     const totalGames = currentLeagueEntry.wins + currentLeagueEntry.losses;
-    if (totalGames > 0) {
+    if (totalGames > 0 && rateHistory.length === 0) {
+      // Only use currentLeagueEntry if we don't have rate history
+      winRate = currentLeagueEntry.wins / totalGames;
+    } else if (rateHistory.length > 0) {
+      // Use time-weighted average from rate history (prefer recent data)
+      winRate = calculateTimeWeightedWinRate(rateHistory);
+    } else {
       winRate = currentLeagueEntry.wins / totalGames;
     }
   } else if (matches.length > 0) {
-    const wins = matches.filter((m) => m.win).length;
-    winRate = wins / matches.length;
+    // Use time-weighted average from matches
+    const sortedMatches = [...matches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    winRate = calculateTimeWeightedWinRateFromMatches(sortedMatches);
   } else if (rateHistory.length > 0) {
-    // Fallback to rate history win rate
-    const totalWins = rateHistory.reduce((sum, r) => sum + r.wins, 0);
-    const totalLosses = rateHistory.reduce((sum, r) => sum + r.losses, 0);
-    const totalGames = totalWins + totalLosses;
-    if (totalGames > 0) {
-      winRate = totalWins / totalGames;
-    }
+    // Use time-weighted average from rate history
+    winRate = calculateTimeWeightedWinRate(rateHistory);
   }
 
   // Average LP gain per win (assuming +15 LP per win, -15 LP per loss)
@@ -254,12 +342,17 @@ export interface RateStatistics {
 }
 
 export function calculateStatistics(rateHistory: RateHistory[], currentLeagueEntry?: { queueType?: string; wins?: number; losses?: number; tier?: string; rank?: string; leaguePoints?: number } | null | undefined): RateStatistics | null {
-  if (rateHistory.length === 0 && !currentLeagueEntry) {
+  // Only calculate statistics for solo queue
+  const isSoloQueue = !currentLeagueEntry || currentLeagueEntry.queueType === 'RANKED_SOLO_5x5';
+  
+  if (!isSoloQueue) {
+    // If currentLeagueEntry is not solo queue, return null
     return null;
   }
 
-  // Use currentLeagueEntry for current stats if available and it's solo queue
-  const isSoloQueue = !currentLeagueEntry || currentLeagueEntry.queueType === 'RANKED_SOLO_5x5';
+  if (rateHistory.length === 0 && !currentLeagueEntry) {
+    return null;
+  }
   
   const sorted = [...rateHistory].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -269,18 +362,18 @@ export function calculateStatistics(rateHistory: RateHistory[], currentLeagueEnt
   const latest = sorted.length > 0 ? sorted[sorted.length - 1] : null;
   const first = sorted.length > 0 ? sorted[0] : null;
 
-  // Use currentLeagueEntry for wins/losses if available and it's solo queue
+  // Use currentLeagueEntry for wins/losses if available (solo queue only, no weighting)
   let totalWins: number;
   let totalLosses: number;
   let totalGames: number;
   
-  if (isSoloQueue && currentLeagueEntry && currentLeagueEntry.wins !== undefined && currentLeagueEntry.losses !== undefined) {
-    // Use currentLeagueEntry for current wins/losses (solo queue only)
+  if (currentLeagueEntry && currentLeagueEntry.wins !== undefined && currentLeagueEntry.losses !== undefined) {
+    // Use currentLeagueEntry for current wins/losses (solo queue only, all-time total)
     totalWins = currentLeagueEntry.wins;
     totalLosses = currentLeagueEntry.losses;
     totalGames = totalWins + totalLosses;
   } else if (sorted.length > 0) {
-    // Fallback to rateHistory
+    // Fallback to rateHistory (sum all wins/losses, no weighting)
     totalWins = sorted.reduce((sum, r) => sum + r.wins, 0);
     totalLosses = sorted.reduce((sum, r) => sum + r.losses, 0);
     totalGames = totalWins + totalLosses;
