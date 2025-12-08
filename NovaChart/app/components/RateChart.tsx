@@ -37,6 +37,7 @@ export default function RateChart() {
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
   const [movingAverageWindow, setMovingAverageWindow] = useState<number>(7);
   const [yAxisZoom, setYAxisZoom] = useState<{ min: number; max: number } | null>(null);
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const chartContainerRef = useRef<HTMLDivElement>(null);
   
   // Reset brush when timeRange changes
@@ -44,6 +45,22 @@ export default function RateChart() {
     setTimeRange(newRange);
     setBrushStartIndex(undefined);
     setBrushEndIndex(undefined);
+  };
+
+  // Handle legend click to toggle line visibility
+  const handleLegendClick = (e: any) => {
+    const dataKey = e.dataKey;
+    if (dataKey) {
+      setHiddenLines(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(dataKey)) {
+          newSet.delete(dataKey);
+        } else {
+          newSet.add(dataKey);
+        }
+        return newSet;
+      });
+    }
   };
 
   // Chart data should use ALL data, not filtered data
@@ -94,6 +111,34 @@ export default function RateChart() {
         dataPoints[index].movingAverage = avg.value;
       }
     });
+
+    // Get the last data point and moving average value
+    const lastDataPoint = dataPoints[dataPoints.length - 1];
+    const lastLP = lastDataPoint?.lp ?? 0;
+    const lastMovingAvg = lastDataPoint?.movingAverage ?? lastLP;
+    const lastDate = lastDataPoint ? new Date(lastDataPoint.dateTime) : new Date();
+    
+    // Extend Total LP line to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+    const lastDateTime = lastDate.getTime();
+    
+    // Add today's point if last data point is not today
+    if (lastDateTime < todayTime) {
+      const todayMonth = today.getMonth() + 1;
+      const todayDay = today.getDate();
+      const todayDateStr = `${todayMonth}/${todayDay}`;
+      
+      dataPoints.push({
+        date: todayDateStr,
+        dateValue: todayTime,
+        dateTime: todayTime,
+        lp: lastLP, // Extend last LP value to today
+        movingAverage: lastMovingAvg, // Extend last moving average to today
+        originalEntry: lastDataPoint?.originalEntry,
+      });
+    }
 
     // Add prediction points
     const predictions = generatePredictionPoints(sorted, 30);
@@ -214,7 +259,28 @@ export default function RateChart() {
     }) : [];
 
     // Combine and sort by dateTime
-    const combined = [...(Array.isArray(dataPoints) ? dataPoints : []), ...(Array.isArray(predictionPoints) ? predictionPoints : []), ...goalDatePoints, ...goalLinePoints].sort((a, b) => a.dateTime - b.dateTime);
+    let combined = [...(Array.isArray(dataPoints) ? dataPoints : []), ...(Array.isArray(predictionPoints) ? predictionPoints : []), ...goalDatePoints, ...goalLinePoints].sort((a, b) => a.dateTime - b.dateTime);
+    
+    // Extend moving average to display range end
+    // Get the last data point with moving average
+    const lastDataPointWithMA = dataPoints.filter(d => d.movingAverage !== undefined).pop();
+    if (lastDataPointWithMA && lastDataPointWithMA.movingAverage !== undefined) {
+      // Find the maximum date value in the combined data (including goals)
+      const maxDateValue = Math.max(...combined.map(d => d.dateTime));
+      const lastMAValue = lastDataPointWithMA.movingAverage;
+      const lastMADate = lastDataPointWithMA.dateTime;
+      
+      // If there are data points after the last moving average, extend it
+      if (maxDateValue > lastMADate) {
+        // Find all data points that need moving average extension
+        const pointsNeedingMA = combined.filter(d => d.dateTime > lastMADate && d.dateTime <= maxDateValue);
+        
+        // Add moving average to these points
+        pointsNeedingMA.forEach(point => {
+          point.movingAverage = lastMAValue;
+        });
+      }
+    }
     
     // Remove dateTime before returning (not needed for chart, but keep dateValue)
     const finalData = combined.map(({ dateTime, originalEntry, ...rest }) => rest);
@@ -692,7 +758,7 @@ export default function RateChart() {
             }}
             labelFormatter={(label) => `日付: ${label}`}
           />
-          <Legend />
+          <Legend onClick={handleLegendClick} />
           <Line
             type="monotone"
             dataKey="lp"
@@ -700,7 +766,8 @@ export default function RateChart() {
             strokeWidth={2}
             name="Total LP"
             dot={{ r: 4 }}
-            connectNulls={false}
+            connectNulls={true}
+            hide={hiddenLines.has('lp')}
           />
           <Line
             type="monotone"
@@ -710,7 +777,8 @@ export default function RateChart() {
             strokeDasharray="5 5"
             name={`移動平均 (${movingAverageWindow}日)`}
             dot={false}
-            connectNulls={false}
+            connectNulls={true}
+            hide={hiddenLines.has('movingAverage')}
           />
           <Line
             type="monotone"
@@ -721,22 +789,27 @@ export default function RateChart() {
             name="予測"
             dot={false}
             connectNulls={false}
+            hide={hiddenLines.has('predictedLP')}
           />
-          {Array.isArray(chartData.goalData) && chartData.goalData.map((goalItem, index) => (
-            <Line
-              key={goalItem.goal.id || index}
-              type="linear"
-              dataKey={`goalLineLP_${index}`}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="10 5"
-              dot={{ fill: '#ef4444', r: 4 }}
-              activeDot={{ r: 6 }}
-              connectNulls={true}
-              isAnimationActive={false}
-              name={`目標${index + 1}: ${goalItem.goal.targetTier} ${goalItem.goal.targetRank} ${goalItem.goal.targetLP}LP`}
-            />
-          ))}
+          {Array.isArray(chartData.goalData) && chartData.goalData.map((goalItem, index) => {
+            const goalDataKey = `goalLineLP_${index}`;
+            return (
+              <Line
+                key={goalItem.goal.id || index}
+                type="linear"
+                dataKey={goalDataKey}
+                stroke="#ef4444"
+                strokeWidth={2}
+                strokeDasharray="10 5"
+                dot={{ fill: '#ef4444', r: 4 }}
+                activeDot={{ r: 6 }}
+                connectNulls={true}
+                isAnimationActive={false}
+                name={`目標${index + 1}: ${goalItem.goal.targetTier} ${goalItem.goal.targetRank} ${goalItem.goal.targetLP}LP`}
+                hide={hiddenLines.has(goalDataKey)}
+              />
+            );
+          })}
           <Brush
             dataKey="date"
             height={30}
