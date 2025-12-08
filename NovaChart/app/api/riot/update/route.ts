@@ -69,8 +69,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return the league entry data
+    // Return the league entry data with current date
     // Note: Database operations (checking for existing entries, saving) should be done on client-side
+    const currentDate = new Date();
+    console.log('[Update API] Current rate data:', {
+      tier: entry.tier,
+      rank: entry.rank,
+      lp: entry.leaguePoints,
+      wins: entry.wins,
+      losses: entry.losses,
+      date: currentDate.toISOString(),
+    });
+    
     return NextResponse.json({
       message: 'League entry retrieved',
       entry: {
@@ -79,7 +89,7 @@ export async function POST(request: NextRequest) {
         lp: entry.leaguePoints,
         wins: entry.wins,
         losses: entry.losses,
-        date: new Date().toISOString(),
+        date: currentDate.toISOString(),
       },
     });
   } catch (error) {

@@ -231,6 +231,70 @@ export class RiotApiClient {
     const entries = await this.getLeagueEntriesByPuuid(puuid);
     return entries.find(entry => entry.queueType === 'RANKED_FLEX_SR') || null;
   }
+
+  /**
+   * Get match IDs by PUUID
+   * Uses /lol/match/v5/matches/by-puuid/{puuid}/ids
+   * Returns list of match IDs
+   */
+  async getMatchIdsByPuuid(puuid: string, start?: number, count: number = 20, queue?: number): Promise<string[]> {
+    const regionalUrl = this.getRegionalBaseUrl();
+    let url = `${regionalUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?count=${count}`;
+    if (start !== undefined) {
+      url += `&start=${start}`;
+    }
+    if (queue !== undefined) {
+      url += `&queue=${queue}`;
+    }
+    console.log('[RiotApiClient] getMatchIdsByPuuid - API URL:', url);
+    const data = await this.fetchRiotApi<string[]>(url, `GET /lol/match/v5/matches/by-puuid/{puuid}/ids`);
+    console.log('[RiotApiClient] getMatchIdsByPuuid - Match IDs count:', data.length);
+    return data;
+  }
+
+  /**
+   * Get match details by match ID
+   * Uses /lol/match/v5/matches/{matchId}
+   */
+  async getMatchByMatchId(matchId: string): Promise<any> {
+    const regionalUrl = this.getRegionalBaseUrl();
+    const url = `${regionalUrl}/lol/match/v5/matches/${matchId}`;
+    console.log('[RiotApiClient] getMatchByMatchId - API URL:', url);
+    const data = await this.fetchRiotApi<any>(url, `GET /lol/match/v5/matches/{matchId}`);
+    return data;
+  }
+
+  /**
+   * Get all ranked match IDs for a player (up to a limit)
+   * Queue ID 420 = Ranked Solo/Duo, 440 = Ranked Flex
+   */
+  async getAllRankedMatchIds(puuid: string, maxMatches: number = 100): Promise<string[]> {
+    const allMatchIds: string[] = [];
+    let start = 0;
+    const count = 100; // Max per request
+    const queueId = 420; // Ranked Solo/Duo
+
+    while (allMatchIds.length < maxMatches) {
+      try {
+        const matchIds = await this.getMatchIdsByPuuid(puuid, start, count, queueId);
+        if (matchIds.length === 0) {
+          break;
+        }
+        allMatchIds.push(...matchIds);
+        start += count;
+        
+        if (matchIds.length < count) {
+          break; // No more matches
+        }
+      } catch (error) {
+        console.error('[RiotApiClient] Error fetching match IDs:', error);
+        break;
+      }
+    }
+
+    console.log('[RiotApiClient] getAllRankedMatchIds - Total match IDs:', allMatchIds.length);
+    return allMatchIds.slice(0, maxMatches);
+  }
 }
 
 // Utility function to convert tier and rank to LP value for comparison

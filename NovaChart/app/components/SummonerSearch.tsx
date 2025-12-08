@@ -322,6 +322,106 @@ export default function SummonerSearch() {
     }
   };
 
+  const handleFetchRateHistory = async () => {
+    if (!currentSummoner) {
+      const errorMsg = 'サマナーを検索してから実行してください。';
+      console.error('[SummonerSearch] Fetch rate history error:', errorMsg);
+      alert(errorMsg);
+      return;
+    }
+
+    setIsSearching(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+      const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
+
+      if (!apiKey) {
+        const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
+        console.error('[SummonerSearch] API key required:', errorMsg);
+        alert(errorMsg);
+        setIsSearching(false);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/riot/fetch-rate-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          puuid: currentSummoner.puuid,
+          region: currentRegion,
+          apiKey,
+          maxMatches: 100,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        const errorMessage = error.error || 'レート履歴の取得に失敗しました';
+        console.error('[SummonerSearch] Fetch rate history error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log('[SummonerSearch] Rate history fetched:', result);
+      console.log('[SummonerSearch] Rate history entries:', result.rateHistory?.length || 0);
+
+      // Save rate history to database
+      if (result.rateHistory && result.rateHistory.length > 0) {
+        const { addRateHistory } = useAppStore.getState();
+        for (const entry of result.rateHistory) {
+          try {
+            await addRateHistory({
+              date: new Date(entry.date),
+              tier: entry.tier,
+              rank: entry.rank,
+              lp: entry.lp,
+              wins: entry.wins,
+              losses: entry.losses,
+            });
+          } catch (error) {
+            console.error('[SummonerSearch] Error saving rate history entry:', error);
+          }
+        }
+      }
+
+      // Update current league entry
+      if (result.currentEntry) {
+        setCurrentLeagueEntry({
+          leagueId: '',
+          queueType: 'RANKED_SOLO_5x5',
+          tier: result.currentEntry.tier,
+          rank: result.currentEntry.rank,
+          leaguePoints: result.currentEntry.lp,
+          wins: result.currentEntry.wins,
+          losses: result.currentEntry.losses,
+          veteran: false,
+          inactive: false,
+          freshBlood: false,
+          hotStreak: false,
+        });
+      }
+
+      const successMsg = `レート履歴を取得しました。${result.rateHistory?.length || 0}件のエントリを保存しました。`;
+      console.log('[SummonerSearch] Success:', successMsg);
+      alert(successMsg);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '取得に失敗しました';
+      console.error('[SummonerSearch] Fetch rate history error:', error);
+      console.error('[SummonerSearch] Error message:', errorMsg);
+      setError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setIsSearching(false);
+      setLoading(false);
+    }
+  };
+
   const handleUpdateRating = async () => {
     // Always require Riot ID (gameName + tagLine) for update
     let updateGameName = '';
@@ -554,14 +654,22 @@ export default function SummonerSearch() {
           >
             {isSearching ? '検索中...' : '検索'}
           </button>
-          <button
-            type="button"
-            onClick={handleUpdateRating}
-            disabled={isSearching}
-            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSearching ? '更新中...' : 'レート更新'}
-          </button>
+                 <button
+                   type="button"
+                   onClick={handleUpdateRating}
+                   disabled={isSearching}
+                   className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   {isSearching ? '更新中...' : 'レート更新'}
+                 </button>
+                 <button
+                   type="button"
+                   onClick={handleFetchRateHistory}
+                   disabled={isSearching || !currentSummoner}
+                   className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   {isSearching ? '取得中...' : '戦歴から取得'}
+                 </button>
         </div>
       </form>
     </div>

@@ -50,6 +50,10 @@ export const rateHistoryService = {
     return await db.rateHistory.delete(id);
   },
 
+  async deleteAll(): Promise<void> {
+    return await db.rateHistory.clear();
+  },
+
   async getLatest(): Promise<RateHistory | undefined> {
     return await db.rateHistory.orderBy('date').last();
   },

@@ -23,13 +23,15 @@ interface ChartDataPoint {
   movingAverage?: number;
   predictedLP?: number;
   goalLP?: number;
+  originalEntry?: RateHistory;
 }
 
 type TimeRange = 'all' | '5years' | '1year' | '1month' | '1week';
 
 export default function RateChart() {
-  const { rateHistory, goals } = useAppStore();
+  const { rateHistory, goals, clearRateHistory } = useAppStore();
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [isResetting, setIsResetting] = useState(false);
 
   // Filter rate history by time range
   const filteredRateHistory = useMemo(() => {
@@ -72,14 +74,27 @@ export default function RateChart() {
       return [];
     }
 
+    // Sort by date (oldest first)
     const sorted = [...filteredRateHistory].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    const dataPoints: ChartDataPoint[] = sorted.map((entry) => ({
-      date: new Date(entry.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
-      lp: tierRankToLP(entry.tier, entry.rank, entry.lp),
-    }));
+    console.log('[RateChart] Processing rate history:', sorted.length, 'entries');
+    console.log('[RateChart] First entry:', sorted[0]);
+    console.log('[RateChart] Last entry:', sorted[sorted.length - 1]);
+
+    // Create data points with full date info for sorting
+    const dataPoints: (ChartDataPoint & { dateTime: number; originalEntry: RateHistory })[] = sorted.map((entry) => {
+      const dateTime = new Date(entry.date).getTime();
+      const totalLP = tierRankToLP(entry.tier, entry.rank, entry.lp);
+      console.log(`[RateChart] Entry: ${new Date(entry.date).toLocaleDateString('ja-JP')} - ${entry.tier} ${entry.rank} ${entry.lp}LP = Total LP: ${totalLP}`);
+      return {
+        date: new Date(entry.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
+        dateTime,
+        lp: totalLP,
+        originalEntry: entry,
+      };
+    });
 
     // Add moving average
     const movingAvg = calculateMovingAverage(sorted, 7);
@@ -91,11 +106,15 @@ export default function RateChart() {
 
     // Add prediction points
     const predictions = generatePredictionPoints(sorted, 30);
-    const predictionPoints: ChartDataPoint[] = predictions.map((pred) => ({
-      date: new Date(pred.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
-      lp: NaN,
-      predictedLP: pred.predictedLP,
-    }));
+    const predictionPoints: (ChartDataPoint & { dateTime: number })[] = predictions.map((pred) => {
+      const dateTime = new Date(pred.date).getTime();
+      return {
+        date: new Date(pred.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
+        dateTime,
+        lp: NaN,
+        predictedLP: pred.predictedLP,
+      };
+    });
 
     // Add goal line
     const activeGoal = goals.find((g) => g.isActive);
@@ -109,8 +128,16 @@ export default function RateChart() {
       });
     }
 
-    // Combine data points with prediction points
-    return [...dataPoints, ...predictionPoints];
+    // Combine and sort by dateTime
+    const combined = [...dataPoints, ...predictionPoints].sort((a, b) => a.dateTime - b.dateTime);
+    
+    // Remove dateTime before returning (not needed for chart)
+    const finalData = combined.map(({ dateTime, originalEntry, ...rest }) => rest);
+    
+    console.log('[RateChart] Final chart data points:', finalData.length);
+    console.log('[RateChart] Sample data:', finalData.slice(0, 3));
+    
+    return finalData;
   }, [filteredRateHistory, goals]);
 
   if (rateHistory.length === 0) {
@@ -138,6 +165,26 @@ export default function RateChart() {
             <option value="1month">1か月</option>
             <option value="1week">1週間</option>
           </select>
+          <button
+            onClick={async () => {
+              if (confirm('レート推移データをすべて削除しますか？この操作は取り消せません。')) {
+                setIsResetting(true);
+                try {
+                  await clearRateHistory();
+                  alert('レート推移データをリセットしました。');
+                } catch (error) {
+                  alert('リセットに失敗しました。');
+                  console.error('Failed to reset rate history:', error);
+                } finally {
+                  setIsResetting(false);
+                }
+              }
+            }}
+            disabled={isResetting || rateHistory.length === 0}
+            className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            {isResetting ? 'リセット中...' : 'データリセット'}
+          </button>
         </div>
       </div>
       {filteredRateHistory.length === 0 && rateHistory.length > 0 && (
@@ -151,10 +198,15 @@ export default function RateChart() {
           <XAxis dataKey="date" />
           <YAxis />
           <Tooltip
-            formatter={(value: number) => {
+            formatter={(value: number, name: string, props: any) => {
               if (isNaN(value)) return 'N/A';
+              if (name === 'Total LP' && props.payload.originalEntry) {
+                const entry = props.payload.originalEntry;
+                return `${entry.tier} ${entry.rank} ${entry.lp}LP (Total LP: ${Math.round(value)})`;
+              }
               return Math.round(value);
             }}
+            labelFormatter={(label) => `日付: ${label}`}
           />
           <Legend />
           <Line
@@ -162,7 +214,7 @@ export default function RateChart() {
             dataKey="lp"
             stroke="#3b82f6"
             strokeWidth={2}
-            name="LP"
+            name="Total LP"
             dot={{ r: 4 }}
             connectNulls={false}
           />

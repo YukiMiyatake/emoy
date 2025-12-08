@@ -14,6 +14,7 @@ interface AppState {
   // Actions
   loadRateHistory: () => Promise<void>;
   addRateHistory: (rate: Omit<RateHistory, 'id'>) => Promise<void>;
+  clearRateHistory: () => Promise<void>;
   loadGoals: () => Promise<void>;
   addGoal: (goal: Omit<Goal, 'id'>) => Promise<void>;
   loadMatches: () => Promise<void>;
@@ -54,6 +55,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to add rate history',
+        isLoading: false,
+      });
+    }
+  },
+
+  clearRateHistory: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      await rateHistoryService.deleteAll();
+      await get().loadRateHistory();
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to clear rate history',
         isLoading: false,
       });
     }
