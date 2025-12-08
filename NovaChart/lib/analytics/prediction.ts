@@ -129,6 +129,7 @@ export function calculateMovingAverage(
 
 /**
  * Generate prediction points for visualization
+ * Works for both upward and downward trends
  */
 export function generatePredictionPoints(
   data: RateHistory[],
@@ -139,9 +140,8 @@ export function generatePredictionPoints(
   }
 
   const regression = calculateLinearRegression(data);
-  if (regression.slope <= 0) {
-    return [];
-  }
+  // Allow predictions for both upward (slope > 0) and downward (slope < 0) trends
+  // Only skip if slope is exactly 0 (no change)
 
   const firstDate = new Date(data[0].date).getTime();
   const lastDate = new Date(data[data.length - 1].date).getTime();
