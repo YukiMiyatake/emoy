@@ -36,6 +36,7 @@ export default function RateChart() {
   const [isResetting, setIsResetting] = useState(false);
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
+  const [movingAverageWindow, setMovingAverageWindow] = useState<number>(7);
   
   // Reset brush when timeRange changes
   const handleTimeRangeChange = (newRange: TimeRange) => {
@@ -86,7 +87,7 @@ export default function RateChart() {
     });
 
     // Add moving average
-    const movingAvg = calculateMovingAverage(sorted, 7);
+    const movingAvg = calculateMovingAverage(sorted, movingAverageWindow);
     movingAvg.forEach((avg, index) => {
       if (dataPoints[index]) {
         dataPoints[index].movingAverage = avg.value;
@@ -294,7 +295,7 @@ export default function RateChart() {
       brushStartIndex: brushStart,
       brushEndIndex: brushEnd,
     };
-  }, [rateHistory, goals, timeRange]);
+  }, [rateHistory, goals, timeRange, movingAverageWindow]);
 
   if (rateHistory.length === 0) {
     return (
@@ -310,6 +311,23 @@ export default function RateChart() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">レート推移</h2>
         <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-700 dark:text-gray-300">移動平均:</label>
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={movingAverageWindow}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                if (!isNaN(value) && value >= 1 && value <= 30) {
+                  setMovingAverageWindow(value);
+                }
+              }}
+              className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">日</span>
+          </div>
           <select
             value={timeRange}
             onChange={(e) => handleTimeRangeChange(e.target.value as TimeRange)}
@@ -427,7 +445,7 @@ export default function RateChart() {
             stroke="#10b981"
             strokeWidth={2}
             strokeDasharray="5 5"
-            name="移動平均 (7日)"
+            name={`移動平均 (${movingAverageWindow}日)`}
             dot={false}
             connectNulls={false}
           />
