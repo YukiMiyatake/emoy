@@ -21,8 +21,10 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[API Route] /api/riot/account/me - Region: ${region}`);
     const client = new RiotApiClient(apiKey, region);
-    const account = await client.getAccountByMe();
-    return NextResponse.json(account);
+    const summoner = await client.getSummonerByMe();
+    return NextResponse.json({
+      summoner,
+    });
   } catch (error) {
     console.error('[API Route] Riot API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch account data';

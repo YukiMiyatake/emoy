@@ -14,7 +14,6 @@ export default function SummonerSearch() {
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [region, setRegion] = useState('jp1');
-  const [searchMode, setSearchMode] = useState<'riotId' | 'me'>('riotId');
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
@@ -56,7 +55,7 @@ export default function SummonerSearch() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (searchMode === 'riotId' && (!gameName.trim() || !tagLine.trim())) {
+    if (!gameName.trim() || !tagLine.trim()) {
       const errorMsg = 'ゲーム名とタグラインを入力してください';
       console.error('[SummonerSearch] Validation error:', errorMsg);
       alert(errorMsg);
@@ -72,109 +71,19 @@ export default function SummonerSearch() {
       const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
       const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
       
-      let response;
-      if (searchMode === 'me') {
-        // Use /me endpoint (requires API key)
-        if (!apiKey) {
-          const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
-          console.error('[SummonerSearch] API key required (me mode):', errorMsg);
-          alert(errorMsg);
-          setIsSearching(false);
-          setLoading(false);
-          return;
-        }
-        const url = `/api/riot/account/me?region=${currentRegion}&apiKey=${encodeURIComponent(apiKey)}`;
-        response = await fetch(url);
-        
-        if (response.ok) {
-          const account = await response.json();
-          console.log('[SummonerSearch] Account data:', account);
-          
-          // Get summoner info using PUUID (no id needed, use client directly)
-          const { RiotApiClient } = await import('@/lib/riot/client');
-          const client = new RiotApiClient(apiKey, currentRegion);
-          const summonerData = await client.getSummonerByPuuid(account.puuid);
-          
-          console.log('[SummonerSearch] Summoner response data:', summonerData);
-          
-          // Validate summoner data - only puuid is required
-          if (!summonerData || !summonerData.puuid) {
-            console.error('[SummonerSearch] Invalid summoner data:', summonerData);
-            throw new Error('サマナー情報が不正です。puuidが存在しません。');
-          }
-          
-          // Convert lastUpdated from string to Date if needed
-          const summoner: Summoner = {
-            ...summonerData,
-            lastUpdated: summonerData.lastUpdated instanceof Date 
-              ? summonerData.lastUpdated 
-              : new Date(summonerData.lastUpdated),
-          };
-          
-          console.log('[SummonerSearch] Processed summoner:', summoner);
-          
-          setCurrentSummoner(summoner);
-          
-          // Fetch league entry to display current rank
-          try {
-            const leagueResponse = await fetch(`/api/riot/league-by-puuid?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
-            if (leagueResponse.ok) {
-              const leagueData = await leagueResponse.json();
-              if (leagueData.entry) {
-                // Extract only LeagueEntry fields to avoid including extra fields
-                const entry: LeagueEntry = {
-                  leagueId: leagueData.entry.leagueId || '',
-                  queueType: leagueData.entry.queueType || '',
-                  tier: leagueData.entry.tier || '',
-                  rank: leagueData.entry.rank || '',
-                  leaguePoints: leagueData.entry.leaguePoints || 0,
-                  wins: leagueData.entry.wins || 0,
-                  losses: leagueData.entry.losses || 0,
-                  veteran: leagueData.entry.veteran || false,
-                  inactive: leagueData.entry.inactive || false,
-                  freshBlood: leagueData.entry.freshBlood || false,
-                  hotStreak: leagueData.entry.hotStreak || false,
-                };
-                setCurrentLeagueEntry(entry);
-              }
-            }
-          } catch (error) {
-            console.error('[SummonerSearch] Failed to fetch league entry (from /me):', error);
-            // Don't throw - we can still use the summoner even if league fetch fails
-          }
-          
-          // Save to database on client-side
-          try {
-            const { summonerService } = await import('@/lib/db');
-            await summonerService.addOrUpdate(summoner);
-            console.log('[SummonerSearch] Summoner saved to database successfully');
-          } catch (error) {
-            console.error('[SummonerSearch] Failed to save summoner to database:', error);
-            // Don't throw - we can still use the summoner even if save fails
-          }
-          
-          // Automatically fetch rate history from match history
-          await fetchAndSaveRateHistory(summoner.puuid, currentRegion, apiKey);
-          
-          setIsSearching(false);
-          setLoading(false);
-          return;
-        }
-        // Fall through to error handling
-      } else if (searchMode === 'riotId') {
-        // Use by-riot-id endpoint
-        if (!apiKey) {
-          const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
-          console.error('[SummonerSearch] API key required (riotId mode):', errorMsg);
-          alert(errorMsg);
-          setIsSearching(false);
-          setLoading(false);
-          return;
-        }
-        const url = `/api/riot/account/by-riot-id?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&region=${currentRegion}&apiKey=${encodeURIComponent(apiKey)}`;
-        response = await fetch(url);
-        
-        if (response.ok) {
+      if (!apiKey) {
+        const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
+        console.error('[SummonerSearch] API key required:', errorMsg);
+        alert(errorMsg);
+        setIsSearching(false);
+        setLoading(false);
+        return;
+      }
+      
+      const url = `/api/riot/account/by-riot-id?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&region=${currentRegion}&apiKey=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
           const data = await response.json();
           console.log('[SummonerSearch] Response data:', data);
           console.log('[SummonerSearch] Response data type:', typeof data);
@@ -297,10 +206,8 @@ export default function SummonerSearch() {
           setIsSearching(false);
           setLoading(false);
           return;
-        }
-        
-        // Handle error response for riotId mode
-        if (!response.ok) {
+        } else {
+          // Handle error response
           const error = await response.json();
           const errorMessage = error.error || 'サマナーが見つかりませんでした';
           
@@ -321,29 +228,6 @@ export default function SummonerSearch() {
           
           throw new Error(errorMessage);
         }
-      }
-      
-      // Handle error response for me mode
-      if (searchMode === 'me' && !response.ok) {
-        const error = await response.json();
-        const errorMessage = error.error || 'アカウント情報の取得に失敗しました';
-        
-        // Provide more helpful error messages
-        if (response.status === 403) {
-          throw new Error('APIキーが無効または権限がありません。右上の「APIキー設定」で正しいAPIキーを設定してください。開発用APIキーは24時間で期限切れになります。');
-        } else if (response.status === 401 || response.status === 500) {
-          if (error.error && error.error.includes('not configured')) {
-            throw new Error('APIキーが設定されていません。右上の「APIキー設定」からAPIキーを入力してください。');
-          }
-          throw new Error(errorMessage);
-        } else if (response.status === 404) {
-          throw new Error('アカウント情報が見つかりませんでした。');
-        } else if (response.status === 429) {
-          throw new Error('APIレート制限に達しました。しばらく待ってから再試行してください。');
-        }
-        
-        throw new Error(errorMessage);
-      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '検索に失敗しました';
       console.error('[SummonerSearch] Search error:', error);
@@ -490,91 +374,42 @@ export default function SummonerSearch() {
       )}
 
       <form onSubmit={handleSearch} className="space-y-3">
-        <div className="flex items-center gap-4">
-          <div className="flex gap-3">
-            <label className="flex items-center text-sm">
-              <input
-                type="radio"
-                value="riotId"
-                checked={searchMode === 'riotId'}
-                onChange={(e) => setSearchMode(e.target.value as 'riotId')}
-                className="mr-1.5"
-              />
-              Riot ID
-            </label>
-            <label className="flex items-center text-sm">
-              <input
-                type="radio"
-                value="me"
-                checked={searchMode === 'me'}
-                onChange={(e) => setSearchMode(e.target.value as 'me')}
-                className="mr-1.5"
-              />
-              自分のアカウント
-            </label>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1">ゲーム名</label>
+            <input
+              type="text"
+              value={gameName}
+              onChange={(e) => setGameName(e.target.value)}
+              placeholder="ゲーム名"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">タグライン</label>
+            <input
+              type="text"
+              value={tagLine}
+              onChange={(e) => setTagLine(e.target.value)}
+              placeholder="タグライン"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">リージョン</label>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="jp1">JP</option>
+              <option value="kr">KR</option>
+              <option value="na1">NA</option>
+              <option value="euw1">EUW</option>
+              <option value="eun1">EUN</option>
+            </select>
           </div>
         </div>
-
-        {searchMode === 'riotId' && (
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">ゲーム名</label>
-              <input
-                type="text"
-                value={gameName}
-                onChange={(e) => setGameName(e.target.value)}
-                placeholder="ゲーム名"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">タグライン</label>
-              <input
-                type="text"
-                value={tagLine}
-                onChange={(e) => setTagLine(e.target.value)}
-                placeholder="タグライン"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">リージョン</label>
-              <select
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="jp1">JP</option>
-                <option value="kr">KR</option>
-                <option value="na1">NA</option>
-                <option value="euw1">EUW</option>
-                <option value="eun1">EUN</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {searchMode === 'me' && (
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <p className="text-xs text-gray-600 dark:text-gray-400">APIキーで認証された自分のアカウント情報を取得します</p>
-            </div>
-            <div className="w-24">
-              <label className="block text-xs font-medium mb-1">リージョン</label>
-              <select
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="jp1">JP</option>
-                <option value="kr">KR</option>
-                <option value="na1">NA</option>
-                <option value="euw1">EUW</option>
-                <option value="eun1">EUN</option>
-              </select>
-            </div>
-          </div>
-        )}
 
         <button
           type="submit"

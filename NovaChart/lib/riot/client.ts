@@ -148,22 +148,30 @@ export class RiotApiClient {
   }
 
   /**
-   * Get account information for the authenticated user (requires API key)
-   * Uses regional routing (ASIA, AMERICAS, EUROPE)
+   * Get summoner information for the authenticated user (requires API key)
+   * Uses platform routing: /lol/summoner/v4/summoners/me
    */
-  async getAccountByMe(): Promise<{
-    puuid: string;
-    gameName: string;
-    tagLine: string;
-  }> {
-    const url = `${this.getRegionalBaseUrl()}/riot/account/v1/accounts/me`;
+  async getSummonerByMe(): Promise<Summoner> {
+    const url = `${this.getBaseUrl()}/lol/summoner/v4/summoners/me`;
     const data = await this.fetchRiotApi<{
+      id: string;
+      accountId: string;
       puuid: string;
-      gameName: string;
-      tagLine: string;
-    }>(url, `GET /riot/account/v1/accounts/me`);
+      name: string;
+      profileIconId: number;
+      revisionDate: number;
+      summonerLevel: number;
+    }>(url, `GET /lol/summoner/v4/summoners/me`);
 
-    return data;
+    return {
+      id: data.id,
+      puuid: data.puuid,
+      name: data.name,
+      profileIconId: data.profileIconId,
+      summonerLevel: data.summonerLevel,
+      region: this.region,
+      lastUpdated: new Date(),
+    };
   }
 
   /**
