@@ -6,45 +6,59 @@ import { Summoner, LeagueEntry } from '@/types';
 
 const API_KEY_STORAGE_KEY = 'riot_api_key';
 const API_REGION_STORAGE_KEY = 'riot_api_region';
-const GAME_NAME_STORAGE_KEY = 'riot_game_name';
-const TAG_LINE_STORAGE_KEY = 'riot_tag_line';
+const RIOT_ID_STORAGE_KEY = 'riot_id';
+const GAME_NAME_STORAGE_KEY = 'riot_game_name'; // For backward compatibility
+const TAG_LINE_STORAGE_KEY = 'riot_tag_line'; // For backward compatibility
 
-export default function SummonerSearch() {
-  const { setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, currentSummoner, currentLeagueEntry } = useAppStore();
-  const [gameName, setGameName] = useState('');
-  const [tagLine, setTagLine] = useState('');
+interface SummonerSearchProps {
+  isExpanded?: boolean;
+  setIsExpanded?: (expanded: boolean) => void;
+  onSearchSuccess?: () => void;
+}
+
+export default function SummonerSearch({ 
+  isExpanded: isExpandedProp, 
+  setIsExpanded: setIsExpandedProp,
+  onSearchSuccess 
+}: SummonerSearchProps = {}) {
+  const { setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError } = useAppStore();
+  const [riotId, setRiotId] = useState('');
   const [region, setRegion] = useState('jp1');
   const [isSearching, setIsSearching] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(true);
+  
+  // Use prop if provided, otherwise use internal state
+  const isExpanded = isExpandedProp !== undefined ? isExpandedProp : internalExpanded;
+  const setIsExpanded = setIsExpandedProp || setInternalExpanded;
 
   useEffect(() => {
     // Load saved values from localStorage
     const savedRegion = localStorage.getItem(API_REGION_STORAGE_KEY);
+    const savedRiotId = localStorage.getItem(RIOT_ID_STORAGE_KEY);
+    
+    // For backward compatibility, also check old keys
     const savedGameName = localStorage.getItem(GAME_NAME_STORAGE_KEY);
     const savedTagLine = localStorage.getItem(TAG_LINE_STORAGE_KEY);
     
     if (savedRegion) {
       setRegion(savedRegion);
     }
-    if (savedGameName) {
-      setGameName(savedGameName);
-    }
-    if (savedTagLine) {
-      setTagLine(savedTagLine);
+    
+    if (savedRiotId) {
+      setRiotId(savedRiotId);
+    } else if (savedGameName && savedTagLine) {
+      // Migrate from old format
+      setRiotId(`${savedGameName}#${savedTagLine}`);
+      localStorage.setItem(RIOT_ID_STORAGE_KEY, `${savedGameName}#${savedTagLine}`);
     }
   }, []);
 
-  // Save gameName and tagLine to localStorage when they change
+  // Save riotId to localStorage when it changes
   useEffect(() => {
-    if (gameName.trim()) {
-      localStorage.setItem(GAME_NAME_STORAGE_KEY, gameName);
+    if (riotId.trim()) {
+      localStorage.setItem(RIOT_ID_STORAGE_KEY, riotId);
     }
-  }, [gameName]);
-
-  useEffect(() => {
-    if (tagLine.trim()) {
-      localStorage.setItem(TAG_LINE_STORAGE_KEY, tagLine);
-    }
-  }, [tagLine]);
+  }, [riotId]);
 
   useEffect(() => {
     if (region) {
@@ -55,12 +69,17 @@ export default function SummonerSearch() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!gameName.trim() || !tagLine.trim()) {
-      const errorMsg = 'ゲーム名とタグラインを入力してください';
+    // Parse Riot ID (gameName#tagLine)
+    const parts = riotId.split('#');
+    if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+      const errorMsg = 'Riot IDを「ゲーム名#タグライン」の形式で入力してください（例: PlayerName#JP1）';
       console.error('[SummonerSearch] Validation error:', errorMsg);
       alert(errorMsg);
       return;
     }
+    
+    const gameName = parts[0].trim();
+    const tagLine = parts[1].trim();
 
     setIsSearching(true);
     setLoading(true);
@@ -202,6 +221,12 @@ export default function SummonerSearch() {
           
           // Automatically fetch rate history from match history
           await fetchAndSaveRateHistory(summoner.puuid, currentRegion, apiKey);
+          
+          // Close the search form after successful search
+          setIsExpanded(false);
+          if (onSearchSuccess) {
+            onSearchSuccess();
+          }
           
           setIsSearching(false);
           setLoading(false);
@@ -349,49 +374,28 @@ export default function SummonerSearch() {
 
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-      {currentSummoner && (
-        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900 rounded">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-base">現在のサマナー: {currentSummoner.name}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                {currentSummoner.region} | Lv.{currentSummoner.summonerLevel}
-              </p>
-            </div>
-            {currentLeagueEntry && (
-              <div className="text-right">
-                <p className="font-bold text-lg">
-                  {currentLeagueEntry.tier} {currentLeagueEntry.rank}
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  {currentLeagueEntry.leaguePoints} LP | {currentLeagueEntry.wins}勝 {currentLeagueEntry.losses}敗
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSearch} className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow ${isExpanded ? 'p-4' : 'p-2'}`}>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
+        >
+          <span>{isExpanded ? '▼' : '▶'}</span>
+          <span>サマナー検索</span>
+        </button>
+      </div>
+      
+      {isExpanded && (
+        <form onSubmit={handleSearch} className="space-y-3 mt-3">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium mb-1">ゲーム名</label>
+            <label className="block text-xs font-medium mb-1">Riot ID</label>
             <input
               type="text"
-              value={gameName}
-              onChange={(e) => setGameName(e.target.value)}
-              placeholder="ゲーム名"
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">タグライン</label>
-            <input
-              type="text"
-              value={tagLine}
-              onChange={(e) => setTagLine(e.target.value)}
-              placeholder="タグライン"
+              value={riotId}
+              onChange={(e) => setRiotId(e.target.value)}
+              placeholder="ゲーム名#タグライン（例: PlayerName#JP1）"
               className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -419,6 +423,7 @@ export default function SummonerSearch() {
           {isSearching ? '検索中...' : '検索'}
         </button>
       </form>
+      )}
     </div>
   );
 }

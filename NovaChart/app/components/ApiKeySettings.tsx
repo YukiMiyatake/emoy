@@ -5,11 +5,24 @@ import { useState, useEffect } from 'react';
 const API_KEY_STORAGE_KEY = 'riot_api_key';
 const API_REGION_STORAGE_KEY = 'riot_api_region';
 
-export default function ApiKeySettings() {
+interface ApiKeySettingsProps {
+  isExpanded?: boolean;
+  setIsExpanded?: (expanded: boolean) => void;
+}
+
+export default function ApiKeySettings({ 
+  isExpanded: isExpandedProp, 
+  setIsExpanded: setIsExpandedProp 
+}: ApiKeySettingsProps = {}) {
   const [apiKey, setApiKey] = useState('');
   const [region, setRegion] = useState('jp1');
   const [isSaved, setIsSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(true);
+  
+  // Use prop if provided, otherwise use internal state
+  const isExpanded = isExpandedProp !== undefined ? isExpandedProp : internalExpanded;
+  const setIsExpanded = setIsExpandedProp || setInternalExpanded;
 
   useEffect(() => {
     // Load from localStorage
@@ -40,10 +53,20 @@ export default function ApiKeySettings() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-      <h3 className="text-sm font-semibold mb-3">APIキー設定</h3>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow ${isExpanded ? 'p-4' : 'p-2'}`}>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
+        >
+          <span>{isExpanded ? '▼' : '▶'}</span>
+          <span>APIキー設定</span>
+        </button>
+      </div>
       
-      <div className="space-y-3">
+      {isExpanded && (
+        <div className="space-y-3 mt-3">
         <div>
           <div className="flex gap-2">
             <input
@@ -89,7 +112,8 @@ export default function ApiKeySettings() {
             クリア
           </button>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
