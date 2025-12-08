@@ -24,9 +24,15 @@ export default function StatsPanel() {
   } : null;
   
   const stats = calculateStatistics(soloQueueRateHistory, leagueEntryForStats);
-  const activeGoal = goals.find(g => g.isActive);
-  const progress = activeGoal ? calculateProgress(soloQueueRateHistory, activeGoal) : null;
-  const requiredMatches = activeGoal ? calculateRequiredMatches(soloQueueRateHistory, matches, activeGoal, 3, leagueEntryForStats) : null;
+  
+  // Find the nearest goal (goal with the closest target date)
+  const activeGoals = goals.filter(g => g.isActive);
+  const nearestGoal = activeGoals.length > 0 
+    ? activeGoals.sort((a, b) => new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime())[0]
+    : null;
+  
+  const progress = nearestGoal ? calculateProgress(soloQueueRateHistory, nearestGoal) : null;
+  const requiredMatches = nearestGoal ? calculateRequiredMatches(soloQueueRateHistory, matches, nearestGoal, 3, leagueEntryForStats) : null;
 
   if (!stats) {
     return (

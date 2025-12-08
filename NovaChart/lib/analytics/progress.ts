@@ -28,9 +28,35 @@ export function calculateProgress(
     return null;
   }
 
-  const latest = rateHistory[rateHistory.length - 1];
+  const sortedHistory = [...rateHistory].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const latest = sortedHistory[sortedHistory.length - 1];
   const currentLP = tierRankToLP(latest.tier, latest.rank, latest.lp);
   const targetLP = tierRankToLP(goal.targetTier, goal.targetRank, goal.targetLP);
+
+  // Find the starting LP at the time the goal was created
+  const createdAt = new Date(goal.createdAt).getTime();
+  const entriesBeforeCreatedAt = sortedHistory.filter(e => new Date(e.date).getTime() <= createdAt);
+  let startLP: number;
+  
+  if (entriesBeforeCreatedAt.length > 0) {
+    // Get the latest entry before or equal to createdAt
+    const closestEntry = entriesBeforeCreatedAt[entriesBeforeCreatedAt.length - 1];
+    startLP = tierRankToLP(closestEntry.tier, closestEntry.rank, closestEntry.lp);
+  } else if (sortedHistory.length > 0) {
+    // If no entry before createdAt, use the first entry (earliest available)
+    const firstEntry = sortedHistory[0];
+    startLP = tierRankToLP(firstEntry.tier, firstEntry.rank, firstEntry.lp);
+  } else {
+    return null;
+  }
+
+  // Calculate progress based on start LP
+  const totalLPNeeded = targetLP - startLP;
+  const lpGained = currentLP - startLP;
+  const lpRemaining = targetLP - currentLP;
 
   if (currentLP >= targetLP) {
     return {
@@ -43,28 +69,66 @@ export function calculateProgress(
     };
   }
 
-  const lpRemaining = targetLP - currentLP;
-
-  // Calculate average LP change per day
-  if (rateHistory.length < 2) {
+  // If target is lower than start (downgrade goal), handle differently
+  if (totalLPNeeded <= 0) {
+    // This means target is actually lower than start, which doesn't make sense for progress
+    // But we'll still calculate based on absolute difference
+    const absoluteNeeded = Math.abs(totalLPNeeded);
+    const absoluteGained = Math.abs(lpGained);
+    const progressPercentage = absoluteNeeded > 0 
+      ? Math.min(100, (absoluteGained / absoluteNeeded) * 100)
+      : 0;
+    
     return {
       currentLP,
       targetLP,
-      progressPercentage: 0,
+      progressPercentage: Math.round(progressPercentage * 100) / 100,
+      lpRemaining,
+      daysRemaining: 0,
+      averageLPPerDay: 0,
+    };
+  }
+
+  // Calculate progress percentage: (LP gained / LP needed) * 100
+  const progressPercentage = Math.min(100, (lpGained / totalLPNeeded) * 100);
+
+  // Calculate average LP change per day
+  if (sortedHistory.length < 2) {
+    return {
+      currentLP,
+      targetLP,
+      progressPercentage: Math.round(progressPercentage * 100) / 100,
       lpRemaining,
       daysRemaining: Infinity,
       averageLPPerDay: 0,
     };
   }
 
-  const sortedHistory = [...rateHistory].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
+  // Use recent trend (last 60 days or half of the data, whichever is smaller)
+  // This gives more weight to recent performance
+  const recentDays = 60;
+  const lastDate = new Date(sortedHistory[sortedHistory.length - 1].date);
+  const cutoffDate = new Date(lastDate);
+  cutoffDate.setDate(cutoffDate.getDate() - recentDays);
+  
+  // Find the index of the first entry within the recent period
+  let startIndex = 0;
+  for (let i = sortedHistory.length - 1; i >= 0; i--) {
+    const entryDate = new Date(sortedHistory[i].date);
+    if (entryDate < cutoffDate) {
+      startIndex = i + 1;
+      break;
+    }
+  }
+  
+  // Use at least 2 entries, or use half of the data if we have less than 60 days of data
+  const minEntries = Math.max(2, Math.floor(sortedHistory.length / 2));
+  const effectiveStartIndex = Math.max(0, Math.min(startIndex, sortedHistory.length - minEntries));
+  
   const firstLP = tierRankToLP(
-    sortedHistory[0].tier,
-    sortedHistory[0].rank,
-    sortedHistory[0].lp
+    sortedHistory[effectiveStartIndex].tier,
+    sortedHistory[effectiveStartIndex].rank,
+    sortedHistory[effectiveStartIndex].lp
   );
   const lastLP = tierRankToLP(
     sortedHistory[sortedHistory.length - 1].tier,
@@ -72,8 +136,7 @@ export function calculateProgress(
     sortedHistory[sortedHistory.length - 1].lp
   );
 
-  const firstDate = new Date(sortedHistory[0].date);
-  const lastDate = new Date(sortedHistory[sortedHistory.length - 1].date);
+  const firstDate = new Date(sortedHistory[effectiveStartIndex].date);
   const daysElapsed = Math.max(
     1,
     (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -83,11 +146,6 @@ export function calculateProgress(
 
   const daysRemaining =
     averageLPPerDay > 0 ? Math.ceil(lpRemaining / averageLPPerDay) : Infinity;
-
-  const progressPercentage = Math.min(
-    100,
-    (currentLP / targetLP) * 100
-  );
 
   return {
     currentLP,
