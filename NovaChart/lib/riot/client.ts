@@ -11,6 +11,9 @@ const RIOT_API_BASE_URL = 'https://{region}.api.riotgames.com';
 const RIOT_API_REGIONAL_BASE_URL = 'https://{routing}.api.riotgames.com';
 
 // Map platform regions to regional routing
+// Platform regions (jp1, kr, na1, etc.) are used for summoner-v4, league-v4
+// Regional routing (asia, americas, europe) is used for account-v1, match-v5
+// Example: jp1 -> asia, na1 -> americas, euw1 -> europe
 function getRegionalRouting(platformRegion: string): string {
   const asiaRegions = ['jp1', 'kr', 'oc1', 'ph2', 'sg2', 'th2', 'tw2', 'vn2'];
   const americasRegions = ['na1', 'br1', 'la1', 'la2'];
@@ -103,58 +106,23 @@ export class RiotApiClient {
   }
 
   private getBaseUrl(): string {
-    // All regions use the same base URL structure
+    // Platform routing for summoner-v4, league-v4, etc.
     // For League of Legends: https://{region}.api.riotgames.com
     // Valid regions: jp1, kr, na1, euw1, eun1, br1, la1, la2, oc1, tr1, ru
     return RIOT_API_BASE_URL.replace('{region}', this.region);
   }
 
-  async getSummonerByName(summonerName: string): Promise<Summoner> {
-    const encodedName = encodeURIComponent(summonerName);
-    const url = `${this.getBaseUrl()}/lol/summoner/v4/summoners/by-name/${encodedName}`;
-    const data = await this.fetchRiotApi<{
-      id: string;
-      accountId: string;
-      puuid: string;
-      name: string;
-      profileIconId: number;
-      revisionDate: number;
-      summonerLevel: number;
-    }>(url, `GET /lol/summoner/v4/summoners/by-name/{summonerName}`);
-
-    return {
-      id: data.id,
-      puuid: data.puuid,
-      name: data.name,
-      profileIconId: data.profileIconId,
-      summonerLevel: data.summonerLevel,
-      region: this.region,
-      lastUpdated: new Date(),
-    };
+  private getRegionalBaseUrl(): string {
+    // Regional routing for account-v1, match-v5, etc.
+    // Converts platform region (jp1, kr, na1, etc.) to regional routing (asia, americas, europe)
+    // Example: jp1 -> asia, na1 -> americas, euw1 -> europe
+    // Returns: https://asia.api.riotgames.com, https://americas.api.riotgames.com, or https://europe.api.riotgames.com
+    const routing = getRegionalRouting(this.region);
+    return RIOT_API_REGIONAL_BASE_URL.replace('{routing}', routing);
   }
 
-  async getSummonerById(summonerId: string): Promise<Summoner> {
-    const url = `${this.getBaseUrl()}/lol/summoner/v4/summoners/${summonerId}`;
-    const data = await this.fetchRiotApi<{
-      id: string;
-      accountId: string;
-      puuid: string;
-      name: string;
-      profileIconId: number;
-      revisionDate: number;
-      summonerLevel: number;
-    }>(url, `GET /lol/summoner/v4/summoners/{summonerId}`);
-
-    return {
-      id: data.id,
-      puuid: data.puuid,
-      name: data.name,
-      profileIconId: data.profileIconId,
-      summonerLevel: data.summonerLevel,
-      region: this.region,
-      lastUpdated: new Date(),
-    };
-  }
+  // Note: getSummonerByName and getSummonerById are deprecated.
+  // Use getAccountByRiotId and getSummonerByPuuid instead.
 
   async getSummonerByPuuid(puuid: string): Promise<Summoner> {
     const url = `${this.getBaseUrl()}/lol/summoner/v4/summoners/by-puuid/${puuid}`;
@@ -219,19 +187,43 @@ export class RiotApiClient {
     return data;
   }
 
-  async getLeagueEntries(summonerId: string): Promise<LeagueEntry[]> {
-    const url = `${this.getBaseUrl()}/lol/league/v4/entries/by-summoner/${summonerId}`;
-    const data = await this.fetchRiotApi<LeagueEntry[]>(url, `GET /lol/league/v4/entries/by-summoner/{summonerId}`);
+  /**
+   * Get account information by PUUID
+   * Uses regional routing (ASIA, AMERICAS, EUROPE)
+   */
+  async getAccountByPuuid(puuid: string): Promise<{
+    puuid: string;
+    gameName: string;
+    tagLine: string;
+  }> {
+    const url = `${this.getRegionalBaseUrl()}/riot/account/v1/accounts/by-puuid/${puuid}`;
+    const data = await this.fetchRiotApi<{
+      puuid: string;
+      gameName: string;
+      tagLine: string;
+    }>(url, `GET /riot/account/v1/accounts/by-puuid/{puuid}`);
+
     return data;
   }
 
-  async getRankedSoloQueueEntry(summonerId: string): Promise<LeagueEntry | null> {
-    const entries = await this.getLeagueEntries(summonerId);
+  /**
+   * Get league entries by PUUID
+   * Uses /lol/league/v4/entries/by-puuid/{encryptedPUUID}
+   * Note: encryptedPUUID is the puuid itself
+   */
+  async getLeagueEntriesByPuuid(puuid: string): Promise<LeagueEntry[]> {
+    const url = `${this.getBaseUrl()}/lol/league/v4/entries/by-puuid/${puuid}`;
+    const data = await this.fetchRiotApi<LeagueEntry[]>(url, `GET /lol/league/v4/entries/by-puuid/{encryptedPUUID}`);
+    return data;
+  }
+
+  async getRankedSoloQueueEntryByPuuid(puuid: string): Promise<LeagueEntry | null> {
+    const entries = await this.getLeagueEntriesByPuuid(puuid);
     return entries.find(entry => entry.queueType === 'RANKED_SOLO_5x5') || null;
   }
 
-  async getRankedFlexEntry(summonerId: string): Promise<LeagueEntry | null> {
-    const entries = await this.getLeagueEntries(summonerId);
+  async getRankedFlexEntryByPuuid(puuid: string): Promise<LeagueEntry | null> {
+    const entries = await this.getLeagueEntriesByPuuid(puuid);
     return entries.find(entry => entry.queueType === 'RANKED_FLEX_SR') || null;
   }
 }

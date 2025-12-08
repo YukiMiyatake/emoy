@@ -6,40 +6,60 @@ import { Summoner } from '@/types';
 
 const API_KEY_STORAGE_KEY = 'riot_api_key';
 const API_REGION_STORAGE_KEY = 'riot_api_region';
+const GAME_NAME_STORAGE_KEY = 'riot_game_name';
+const TAG_LINE_STORAGE_KEY = 'riot_tag_line';
 
 export default function SummonerSearch() {
   const { setCurrentSummoner, setLoading, setError, currentSummoner } = useAppStore();
-  const [summonerName, setSummonerName] = useState('');
-  const [summonerId, setSummonerId] = useState('');
-  const [puuid, setPuuid] = useState('');
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [region, setRegion] = useState('jp1');
-  const [searchMode, setSearchMode] = useState<'name' | 'id' | 'puuid' | 'riotId' | 'me'>('name');
+  const [searchMode, setSearchMode] = useState<'riotId' | 'me'>('riotId');
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    // Load region from localStorage
+    // Load saved values from localStorage
     const savedRegion = localStorage.getItem(API_REGION_STORAGE_KEY);
+    const savedGameName = localStorage.getItem(GAME_NAME_STORAGE_KEY);
+    const savedTagLine = localStorage.getItem(TAG_LINE_STORAGE_KEY);
+    
     if (savedRegion) {
       setRegion(savedRegion);
     }
+    if (savedGameName) {
+      setGameName(savedGameName);
+    }
+    if (savedTagLine) {
+      setTagLine(savedTagLine);
+    }
   }, []);
+
+  // Save gameName and tagLine to localStorage when they change
+  useEffect(() => {
+    if (gameName.trim()) {
+      localStorage.setItem(GAME_NAME_STORAGE_KEY, gameName);
+    }
+  }, [gameName]);
+
+  useEffect(() => {
+    if (tagLine.trim()) {
+      localStorage.setItem(TAG_LINE_STORAGE_KEY, tagLine);
+    }
+  }, [tagLine]);
+
+  useEffect(() => {
+    if (region) {
+      localStorage.setItem(API_REGION_STORAGE_KEY, region);
+    }
+  }, [region]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (searchMode === 'name' && !summonerName.trim()) {
-      alert('サマナー名を入力してください');
-      return;
-    } else if (searchMode === 'id' && !summonerId.trim()) {
-      alert('サマナーIDを入力してください');
-      return;
-    } else if (searchMode === 'puuid' && !puuid.trim()) {
-      alert('PUUIDを入力してください');
-      return;
-    } else if (searchMode === 'riotId' && (!gameName.trim() || !tagLine.trim())) {
-      alert('ゲーム名とタグラインを入力してください');
+    if (searchMode === 'riotId' && (!gameName.trim() || !tagLine.trim())) {
+      const errorMsg = 'ゲーム名とタグラインを入力してください';
+      console.error('[SummonerSearch] Validation error:', errorMsg);
+      alert(errorMsg);
       return;
     }
 
@@ -56,7 +76,9 @@ export default function SummonerSearch() {
       if (searchMode === 'me') {
         // Use /me endpoint (requires API key)
         if (!apiKey) {
-          alert('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
+          const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
+          console.error('[SummonerSearch] API key required (me mode):', errorMsg);
+          alert(errorMsg);
           setIsSearching(false);
           setLoading(false);
           return;
@@ -66,25 +88,54 @@ export default function SummonerSearch() {
         
         if (response.ok) {
           const account = await response.json();
-          // Get summoner info using PUUID
-          const summonerResponse = await fetch(`/api/riot/summoner-by-id?puuid=${encodeURIComponent(account.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
-          if (summonerResponse.ok) {
-            const summoner: Summoner = await summonerResponse.json();
-            setCurrentSummoner(summoner);
-            setIsSearching(false);
-            setLoading(false);
-            return;
-          } else {
-            // Handle summoner fetch error
-            const error = await summonerResponse.json();
-            throw new Error(error.error || 'サマナー情報の取得に失敗しました');
+          console.log('[SummonerSearch] Account data:', account);
+          
+          // Get summoner info using PUUID (no id needed, use client directly)
+          const { RiotApiClient } = await import('@/lib/riot/client');
+          const client = new RiotApiClient(apiKey, currentRegion);
+          const summonerData = await client.getSummonerByPuuid(account.puuid);
+          
+          console.log('[SummonerSearch] Summoner response data:', summonerData);
+          
+          // Validate summoner data - only puuid is required
+          if (!summonerData || !summonerData.puuid) {
+            console.error('[SummonerSearch] Invalid summoner data:', summonerData);
+            throw new Error('サマナー情報が不正です。puuidが存在しません。');
           }
+          
+          // Convert lastUpdated from string to Date if needed
+          const summoner: Summoner = {
+            ...summonerData,
+            lastUpdated: summonerData.lastUpdated instanceof Date 
+              ? summonerData.lastUpdated 
+              : new Date(summonerData.lastUpdated),
+          };
+          
+          console.log('[SummonerSearch] Processed summoner:', summoner);
+          
+          setCurrentSummoner(summoner);
+          
+          // Save to database on client-side
+          try {
+            const { summonerService } = await import('@/lib/db');
+            await summonerService.addOrUpdate(summoner);
+            console.log('[SummonerSearch] Summoner saved to database successfully');
+          } catch (error) {
+            console.error('[SummonerSearch] Failed to save summoner to database:', error);
+            // Don't throw - we can still use the summoner even if save fails
+          }
+          
+          setIsSearching(false);
+          setLoading(false);
+          return;
         }
         // Fall through to error handling
       } else if (searchMode === 'riotId') {
         // Use by-riot-id endpoint
         if (!apiKey) {
-          alert('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
+          const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
+          console.error('[SummonerSearch] API key required (riotId mode):', errorMsg);
+          alert(errorMsg);
           setIsSearching(false);
           setLoading(false);
           return;
@@ -94,50 +145,149 @@ export default function SummonerSearch() {
         
         if (response.ok) {
           const data = await response.json();
-          setCurrentSummoner(data.summoner);
+          console.log('[SummonerSearch] Response data:', data);
+          console.log('[SummonerSearch] Response data type:', typeof data);
+          console.log('[SummonerSearch] Response data keys:', data ? Object.keys(data) : 'data is null/undefined');
+          console.log('[SummonerSearch] data.summoner:', data?.summoner);
+          console.log('[SummonerSearch] data.account:', data?.account);
+          
+          // Check if data has summoner property or is the summoner itself
+          const summonerData = data?.summoner || data;
+          console.log('[SummonerSearch] Summoner data:', summonerData);
+          console.log('[SummonerSearch] Summoner data type:', typeof summonerData);
+          console.log('[SummonerSearch] Summoner data keys:', summonerData ? Object.keys(summonerData) : 'summonerData is null/undefined');
+          console.log('[SummonerSearch] Summoner id:', summonerData?.id);
+          console.log('[SummonerSearch] Summoner id type:', typeof summonerData?.id);
+          console.log('[SummonerSearch] Summoner puuid:', summonerData?.puuid);
+          console.log('[SummonerSearch] Summoner puuid type:', typeof summonerData?.puuid);
+          
+          if (!summonerData) {
+            console.error('[SummonerSearch] Summoner data is null or undefined');
+            console.error('[SummonerSearch] Full response data:', JSON.stringify(data, null, 2));
+            const errorMsg = 'サマナー情報が不正です。レスポンスにサマナー情報が含まれていません。';
+            console.error('[SummonerSearch] Error:', errorMsg);
+            throw new Error(errorMsg);
+          }
+          
+          // Check if puuid exists (required)
+          if (!summonerData.puuid) {
+            console.error('[SummonerSearch] Invalid summoner data - missing puuid');
+            console.error('[SummonerSearch] Summoner data:', JSON.stringify(summonerData, null, 2));
+            console.error('[SummonerSearch] Full response data:', JSON.stringify(data, null, 2));
+            const errorMsg = `サマナー情報が不正です。puuidが存在しません。`;
+            console.error('[SummonerSearch] Error:', errorMsg);
+            throw new Error(errorMsg);
+          }
+          
+          // If name is missing, fetch from summoner API using puuid
+          if (!summonerData.name) {
+            console.warn('[SummonerSearch] Summoner name is missing, fetching from API...');
+            try {
+              const { RiotApiClient } = await import('@/lib/riot/client');
+              const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+              const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
+              if (apiKey) {
+                const client = new RiotApiClient(apiKey, currentRegion);
+                const fullSummonerData = await client.getSummonerByPuuid(summonerData.puuid);
+                console.log('[SummonerSearch] Fetched full summoner data:', fullSummonerData);
+                // Merge missing fields into summonerData
+                if (fullSummonerData.name) {
+                  summonerData.name = fullSummonerData.name;
+                }
+                if (fullSummonerData.profileIconId) {
+                  summonerData.profileIconId = fullSummonerData.profileIconId;
+                }
+                if (fullSummonerData.summonerLevel) {
+                  summonerData.summonerLevel = fullSummonerData.summonerLevel;
+                }
+                if (fullSummonerData.id) {
+                  summonerData.id = fullSummonerData.id;
+                }
+                console.log('[SummonerSearch] Updated summonerData:', summonerData);
+              }
+            } catch (error) {
+              console.warn('[SummonerSearch] Error fetching summoner name:', error);
+            }
+          }
+          
+          // Convert lastUpdated from string to Date if needed
+          const summoner: Summoner = {
+            ...summonerData,
+            lastUpdated: summonerData.lastUpdated instanceof Date 
+              ? summonerData.lastUpdated 
+              : new Date(summonerData.lastUpdated),
+          };
+          
+          console.log('[SummonerSearch] Processed summoner:', summoner);
+          
+          setCurrentSummoner(summoner);
+          
+          // Save to database on client-side
+          try {
+            const { summonerService } = await import('@/lib/db');
+            await summonerService.addOrUpdate(summoner);
+            console.log('[SummonerSearch] Summoner saved to database successfully');
+          } catch (error) {
+            console.error('[SummonerSearch] Failed to save summoner to database:', error);
+            // Don't throw - we can still use the summoner even if save fails
+          }
+          
           setIsSearching(false);
           setLoading(false);
           return;
         }
-        // Fall through to error handling
-      } else if (searchMode === 'name') {
-        const url = `/api/riot/summoner?name=${encodeURIComponent(summonerName)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`;
-        response = await fetch(url);
-      } else if (searchMode === 'id') {
-        const url = `/api/riot/summoner-by-id?summonerId=${encodeURIComponent(summonerId)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`;
-        response = await fetch(url);
-      } else {
-        const url = `/api/riot/summoner-by-id?puuid=${encodeURIComponent(puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`;
-        response = await fetch(url);
+        
+        // Handle error response for riotId mode
+        if (!response.ok) {
+          const error = await response.json();
+          const errorMessage = error.error || 'サマナーが見つかりませんでした';
+          
+          // Provide more helpful error messages
+          if (response.status === 403) {
+            throw new Error('APIキーが無効または権限がありません。右上の「APIキー設定」で正しいAPIキーを設定してください。開発用APIキーは24時間で期限切れになります。');
+          } else if (response.status === 401 || response.status === 500) {
+            // Check if it's an API key configuration error
+            if (error.error && error.error.includes('not configured')) {
+              throw new Error('APIキーが設定されていません。右上の「APIキー設定」からAPIキーを入力してください。');
+            }
+            throw new Error(errorMessage);
+          } else if (response.status === 404) {
+            throw new Error('サマナーが見つかりませんでした。入力内容とリージョンを確認してください。');
+          } else if (response.status === 429) {
+            throw new Error('APIレート制限に達しました。しばらく待ってから再試行してください。');
+          }
+          
+          throw new Error(errorMessage);
+        }
       }
       
-      if (!response.ok) {
+      // Handle error response for me mode
+      if (searchMode === 'me' && !response.ok) {
         const error = await response.json();
-        const errorMessage = error.error || 'サマナーが見つかりませんでした';
+        const errorMessage = error.error || 'アカウント情報の取得に失敗しました';
         
         // Provide more helpful error messages
         if (response.status === 403) {
           throw new Error('APIキーが無効または権限がありません。右上の「APIキー設定」で正しいAPIキーを設定してください。開発用APIキーは24時間で期限切れになります。');
         } else if (response.status === 401 || response.status === 500) {
-          // Check if it's an API key configuration error
           if (error.error && error.error.includes('not configured')) {
             throw new Error('APIキーが設定されていません。右上の「APIキー設定」からAPIキーを入力してください。');
           }
           throw new Error(errorMessage);
         } else if (response.status === 404) {
-          throw new Error('サマナーが見つかりませんでした。サマナー名とリージョンを確認してください。');
+          throw new Error('アカウント情報が見つかりませんでした。');
         } else if (response.status === 429) {
           throw new Error('APIレート制限に達しました。しばらく待ってから再試行してください。');
         }
         
         throw new Error(errorMessage);
       }
-
-      const summoner: Summoner = await response.json();
-      setCurrentSummoner(summoner);
     } catch (error) {
-      setError(error instanceof Error ? error.message : '検索に失敗しました');
-      alert(error instanceof Error ? error.message : '検索に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : '検索に失敗しました';
+      console.error('[SummonerSearch] Search error:', error);
+      console.error('[SummonerSearch] Error message:', errorMessage);
+      setError(errorMessage);
+      alert(errorMessage);
     } finally {
       setIsSearching(false);
       setLoading(false);
@@ -145,14 +295,24 @@ export default function SummonerSearch() {
   };
 
   const handleUpdateRating = async () => {
-    // Use current summoner if available, otherwise check input
-    const hasInput = (searchMode === 'name' && summonerName.trim()) ||
-                     (searchMode === 'id' && summonerId.trim()) ||
-                     (searchMode === 'puuid' && puuid.trim()) ||
-                     currentSummoner;
-
-    if (!hasInput) {
-      alert('サマナー情報を入力するか、検索してください');
+    // Always require Riot ID (gameName + tagLine) for update
+    let updateGameName = '';
+    let updateTagLine = '';
+    
+    if (searchMode === 'riotId' && gameName.trim() && tagLine.trim()) {
+      updateGameName = gameName;
+      updateTagLine = tagLine;
+    } else if (currentSummoner) {
+      // If we have current summoner but no Riot ID input, we need to get it
+      // For now, require Riot ID input
+      const errorMsg = 'レート更新にはRiot ID（ゲーム名#タグライン）が必要です。Riot ID検索で検索してから更新してください。';
+      console.error('[SummonerSearch] Update rating error (with currentSummoner):', errorMsg);
+      alert(errorMsg);
+      return;
+    } else {
+      const errorMsg = 'レート更新にはRiot ID（ゲーム名#タグライン）が必要です。Riot ID検索で検索してください。';
+      console.error('[SummonerSearch] Update rating error (no input):', errorMsg);
+      alert(errorMsg);
       return;
     }
 
@@ -165,19 +325,13 @@ export default function SummonerSearch() {
       const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
       const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
       
-      const body: any = { region: currentRegion };
+      const body: any = { 
+        region: currentRegion,
+        gameName: updateGameName,
+        tagLine: updateTagLine,
+      };
       if (apiKey) {
         body.apiKey = apiKey;
-      }
-      if (currentSummoner) {
-        body.summonerId = currentSummoner.id;
-        body.puuid = currentSummoner.puuid;
-      } else if (searchMode === 'name') {
-        body.summonerName = summonerName;
-      } else if (searchMode === 'id') {
-        body.summonerId = summonerId;
-      } else if (searchMode === 'puuid') {
-        body.puuid = puuid;
       }
 
       const response = await fetch('/api/riot/update', {
@@ -195,7 +349,7 @@ export default function SummonerSearch() {
         // Provide more helpful error messages
         if (response.status === 403) {
           // Extract API endpoint from error message if available
-          let apiEndpoint = 'GET /lol/league/v4/entries/by-summoner/{summonerId}';
+          let apiEndpoint = 'GET /lol/league/v4/entries/by-puuid/{encryptedPUUID}';
           if (errorMessage.includes('エラー発生API:')) {
             const match = errorMessage.match(/エラー発生API:\s*([^\n]+)/);
             if (match) {
@@ -213,13 +367,47 @@ export default function SummonerSearch() {
       }
 
       const result = await response.json();
-      alert('レートを更新しました');
       
-      // Reload rate history
-      await useAppStore.getState().loadRateHistory();
+      // Save to database on client-side
+      if (result.entry) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        // Check if we already have today's data
+        const { rateHistory } = useAppStore.getState();
+        const existing = rateHistory.find(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate >= today && entryDate < tomorrow;
+        });
+
+        if (existing) {
+          // Update existing entry (we need to implement update method in store)
+          // For now, just reload
+          await useAppStore.getState().loadRateHistory();
+        } else {
+          // Add new entry
+          await useAppStore.getState().addRateHistory({
+            date: new Date(result.entry.date),
+            tier: result.entry.tier,
+            rank: result.entry.rank,
+            lp: result.entry.lp,
+            wins: result.entry.wins,
+            losses: result.entry.losses,
+          });
+        }
+      }
+      
+      const successMsg = 'レートを更新しました';
+      console.log('[SummonerSearch] Update rating success:', successMsg);
+      alert(successMsg);
     } catch (error) {
-      setError(error instanceof Error ? error.message : '更新に失敗しました');
-      alert(error instanceof Error ? error.message : '更新に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : '更新に失敗しました';
+      console.error('[SummonerSearch] Update rating error:', error);
+      console.error('[SummonerSearch] Error message:', errorMessage);
+      setError(errorMessage);
+      alert(errorMessage);
     } finally {
       setIsSearching(false);
       setLoading(false);
@@ -235,7 +423,7 @@ export default function SummonerSearch() {
           <p className="font-semibold">現在のサマナー:</p>
           <p>{currentSummoner.name}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            ID: {currentSummoner.id} | PUUID: {currentSummoner.puuid.substring(0, 20)}...
+            リージョン: {currentSummoner.region} | レベル: {currentSummoner.summonerLevel}
           </p>
         </div>
       )}
@@ -247,32 +435,22 @@ export default function SummonerSearch() {
             <label className="flex items-center">
               <input
                 type="radio"
-                value="name"
-                checked={searchMode === 'name'}
-                onChange={(e) => setSearchMode(e.target.value as 'name')}
+                value="riotId"
+                checked={searchMode === 'riotId'}
+                onChange={(e) => setSearchMode(e.target.value as 'riotId')}
                 className="mr-2"
               />
-              サマナー名
+              Riot ID
             </label>
             <label className="flex items-center">
               <input
                 type="radio"
-                value="id"
-                checked={searchMode === 'id'}
-                onChange={(e) => setSearchMode(e.target.value as 'id')}
+                value="me"
+                checked={searchMode === 'me'}
+                onChange={(e) => setSearchMode(e.target.value as 'me')}
                 className="mr-2"
               />
-              サマナーID
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="puuid"
-                checked={searchMode === 'puuid'}
-                onChange={(e) => setSearchMode(e.target.value as 'puuid')}
-                className="mr-2"
-              />
-              PUUID
+              自分のアカウント
             </label>
           </div>
         </div>
@@ -307,40 +485,6 @@ export default function SummonerSearch() {
                   />
                 </div>
               </div>
-            )}
-            {searchMode !== 'me' && searchMode !== 'riotId' && (
-              <>
-                <label className="block text-sm font-medium mb-2">
-                  {searchMode === 'name' ? 'サマナー名' : searchMode === 'id' ? 'サマナーID' : 'PUUID'}
-                </label>
-                {searchMode === 'name' && (
-                  <input
-                    type="text"
-                    value={summonerName}
-                    onChange={(e) => setSummonerName(e.target.value)}
-                    placeholder="サマナー名を入力"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                )}
-                {searchMode === 'id' && (
-                  <input
-                    type="text"
-                    value={summonerId}
-                    onChange={(e) => setSummonerId(e.target.value)}
-                    placeholder="サマナーIDを入力"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                )}
-                {searchMode === 'puuid' && (
-                  <input
-                    type="text"
-                    value={puuid}
-                    onChange={(e) => setPuuid(e.target.value)}
-                    placeholder="PUUIDを入力"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                )}
-              </>
             )}
           </div>
           <div>

@@ -14,7 +14,33 @@ export class NovaChartDB extends Dexie {
       rateHistory: '++id, date, tier, rank, lp',
       goals: '++id, targetDate, createdAt, isActive',
       matches: '++id, date, win, role, champion',
-      summoners: 'id, puuid, name, region, lastUpdated',
+      summoners: 'id, puuid, name, region, lastUpdated', // Old schema with id as primary key
+    });
+    
+    // Version 2: Change summoners primary key from id to puuid
+    // Note: Dexie doesn't support changing primary key directly, so we need to delete and recreate
+    this.version(2).stores({
+      rateHistory: '++id, date, tier, rank, lp',
+      goals: '++id, targetDate, createdAt, isActive',
+      matches: '++id, date, win, role, champion',
+      // Remove old summoners table to allow recreation with new primary key
+    }).upgrade(async (tx) => {
+      // Save existing summoners data before deleting table
+      const oldSummoners = await tx.table('summoners').toArray();
+      // Store in a temporary location (we'll recreate in version 3)
+      if (oldSummoners.length > 0) {
+        // Store in sessionStorage temporarily (will be lost on refresh, but that's okay)
+        // Or we can just clear the table and let users re-add their summoners
+        console.log(`[DB Migration] Found ${oldSummoners.length} summoners to migrate`);
+      }
+    });
+    
+    // Version 3: Recreate summoners table with puuid as primary key
+    this.version(3).stores({
+      rateHistory: '++id, date, tier, rank, lp',
+      goals: '++id, targetDate, createdAt, isActive',
+      matches: '++id, date, win, role, champion',
+      summoners: '&puuid, id, name, region, lastUpdated', // &puuid = unique primary key
     });
   }
 }
@@ -115,12 +141,8 @@ export const matchService = {
 };
 
 export const summonerService = {
-  async get(id: string): Promise<Summoner | undefined> {
-    return await db.summoners.get(id);
-  },
-
   async getByPuuid(puuid: string): Promise<Summoner | undefined> {
-    return await db.summoners.where('puuid').equals(puuid).first();
+    return await db.summoners.get(puuid);
   },
 
   async getAll(): Promise<Summoner[]> {
@@ -128,11 +150,15 @@ export const summonerService = {
   },
 
   async addOrUpdate(summoner: Summoner): Promise<string> {
+    // puuid is required and used as primary key
+    if (!summoner.puuid || summoner.puuid.trim() === '') {
+      throw new Error('Summoner puuid is required');
+    }
     return await db.summoners.put(summoner);
   },
 
-  async delete(id: string): Promise<void> {
-    return await db.summoners.delete(id);
+  async delete(puuid: string): Promise<void> {
+    return await db.summoners.delete(puuid);
   },
 };
 

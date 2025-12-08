@@ -17,20 +17,10 @@ export async function GET(request: NextRequest) {
   // Try to get API key from request parameter first, then environment variable
   const apiKey = apiKeyFromRequest || process.env.RIOT_API_KEY;
   
-  // Debug logging
-  console.log('API Key check:', {
-    exists: !!apiKey,
-    length: apiKey?.length || 0,
-    isEmpty: apiKey?.trim() === '',
-    prefix: apiKey?.substring(0, 10) || 'N/A'
-  });
-  
   if (!apiKey || apiKey.trim() === '' || apiKey === 'your_api_key_here') {
-    console.error('RIOT_API_KEY is not set, empty, or still has placeholder value.');
     return NextResponse.json(
       { 
         error: 'Riot API key is not configured. Please set API key in the app settings or .env.local file.',
-        hint: 'You can set the API key in the app settings, or set RIOT_API_KEY in .env.local and restart the dev server.'
       },
       { status: 500 }
     );
@@ -38,14 +28,46 @@ export async function GET(request: NextRequest) {
 
   try {
     console.log(`[API Route] /api/riot/summoner - Summoner: ${summonerName}, Region: ${region}`);
-    console.log(`[API Route] API Key exists: ${!!apiKey}, Length: ${apiKey?.length || 0}`);
     
+    // Parse Riot ID format (gameName#tagLine) or treat as gameName
+    let gameName = summonerName;
+    let tagLine = '';
+    
+    if (summonerName.includes('#')) {
+      const parts = summonerName.split('#');
+      gameName = parts[0];
+      tagLine = parts.slice(1).join('#'); // In case tagLine contains #
+    } else {
+      // If no tagLine provided, return error
+      return NextResponse.json(
+        { 
+          error: 'Riot ID形式（ゲーム名#タグライン）で入力してください。例: PlayerName#JP1',
+          hint: 'サマナー名検索は非推奨のため、Riot ID検索を使用してください。'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!tagLine) {
+      return NextResponse.json(
+        { 
+          error: 'タグラインが必要です。Riot ID形式（ゲーム名#タグライン）で入力してください。例: PlayerName#JP1',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Use by-riot-id endpoint instead of by-name
     const client = new RiotApiClient(apiKey, region);
-    const summoner = await client.getSummonerByName(summonerName);
+    const account = await client.getAccountByRiotId(gameName, tagLine);
+    
+    // Get summoner info using PUUID
+    const summoner = await client.getSummonerByPuuid(account.puuid);
+    
+    // Note: Database save should be done on client-side
     return NextResponse.json(summoner);
   } catch (error) {
     console.error('[API Route] Riot API Error:', error);
-    console.error('[API Route] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch summoner data';
     
     // Return appropriate status code based on error message

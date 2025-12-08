@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RiotApiClient } from '@/lib/riot/client';
-import { summonerService } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -35,8 +34,13 @@ export async function GET(request: NextRequest) {
     
     // Get summoner info using PUUID
     const summoner = await client.getSummonerByPuuid(account.puuid);
-    await summonerService.addOrUpdate(summoner);
     
+    console.log('[API Route] /api/riot/account/by-riot-id - Summoner data:', JSON.stringify(summoner, null, 2));
+    console.log('[API Route] /api/riot/account/by-riot-id - Summoner id:', summoner.id);
+    console.log('[API Route] /api/riot/account/by-riot-id - Summoner name:', summoner.name);
+    console.log('[API Route] /api/riot/account/by-riot-id - Summoner puuid:', summoner.puuid);
+    
+    // Note: Database save should be done on client-side
     return NextResponse.json({
       account,
       summoner,

@@ -33,7 +33,7 @@ export interface Match {
 }
 
 export interface Summoner {
-  id: string;
+  id?: string; // Optional - not required, puuid is the primary identifier
   puuid: string;
   name: string;
   profileIconId: number;
