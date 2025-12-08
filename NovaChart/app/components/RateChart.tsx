@@ -31,9 +31,8 @@ interface ChartDataPoint {
 type TimeRange = 'all' | '5years' | '1year' | '1month' | '1week';
 
 export default function RateChart() {
-  const { rateHistory, goals, clearRateHistory } = useAppStore();
+  const { rateHistory, goals } = useAppStore();
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
-  const [isResetting, setIsResetting] = useState(false);
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
   const [movingAverageWindow, setMovingAverageWindow] = useState<number>(7);
@@ -622,26 +621,6 @@ export default function RateChart() {
             <option value="1month">1か月</option>
             <option value="1week">1週間</option>
           </select>
-          <button
-            onClick={async () => {
-              if (confirm('レート推移データをすべて削除しますか？この操作は取り消せません。')) {
-                setIsResetting(true);
-                try {
-                  await clearRateHistory();
-                  alert('レート推移データをリセットしました。');
-                } catch (error) {
-                  alert('リセットに失敗しました。');
-                  console.error('Failed to reset rate history:', error);
-                } finally {
-                  setIsResetting(false);
-                }
-              }
-            }}
-            disabled={isResetting || rateHistory.length === 0}
-            className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            {isResetting ? 'リセット中...' : 'データリセット'}
-          </button>
         </div>
       </div>
       <div ref={chartContainerRef} className="w-full">

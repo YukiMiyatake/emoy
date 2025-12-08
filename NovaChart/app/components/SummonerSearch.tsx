@@ -153,6 +153,9 @@ export default function SummonerSearch() {
             // Don't throw - we can still use the summoner even if save fails
           }
           
+          // Automatically fetch rate history from match history
+          await fetchAndSaveRateHistory(summoner.puuid, currentRegion, apiKey);
+          
           setIsSearching(false);
           setLoading(false);
           return;
@@ -288,6 +291,9 @@ export default function SummonerSearch() {
             // Don't throw - we can still use the summoner even if save fails
           }
           
+          // Automatically fetch rate history from match history
+          await fetchAndSaveRateHistory(summoner.puuid, currentRegion, apiKey);
+          
           setIsSearching(false);
           setLoading(false);
           return;
@@ -350,39 +356,23 @@ export default function SummonerSearch() {
     }
   };
 
-  const handleFetchRateHistory = async () => {
-    if (!currentSummoner) {
-      const errorMsg = 'サマナーを検索してから実行してください。';
-      console.error('[SummonerSearch] Fetch rate history error:', errorMsg);
-      alert(errorMsg);
-      return;
-    }
-
-    setIsSearching(true);
-    setLoading(true);
-    setError(null);
-
+  // Helper function to fetch and save rate history from match history
+  const fetchAndSaveRateHistory = async (puuid: string, region: string, apiKey: string | null) => {
     try {
-      const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-      const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
-
       if (!apiKey) {
-        const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
-        console.error('[SummonerSearch] API key required:', errorMsg);
-        alert(errorMsg);
-        setIsSearching(false);
-        setLoading(false);
+        console.warn('[SummonerSearch] API key not available for rate history fetch');
         return;
       }
 
+      console.log('[SummonerSearch] Automatically fetching rate history from match history...');
       const response = await fetch('/api/riot/fetch-rate-history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          puuid: currentSummoner.puuid,
-          region: currentRegion,
+          puuid,
+          region,
           apiKey,
           maxMatches: 100,
         }),
@@ -391,8 +381,8 @@ export default function SummonerSearch() {
       if (!response.ok) {
         const error = await response.json();
         const errorMessage = error.error || 'レート履歴の取得に失敗しました';
-        console.error('[SummonerSearch] Fetch rate history error:', errorMessage);
-        throw new Error(errorMessage);
+        console.warn('[SummonerSearch] Failed to fetch rate history:', errorMessage);
+        return; // Don't throw - just log and continue
       }
 
       const result = await response.json();
@@ -448,8 +438,9 @@ export default function SummonerSearch() {
         console.log(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed`);
       }
 
-      // Update current league entry
-      if (result.currentEntry) {
+      // Update current league entry if not already set
+      const currentState = useAppStore.getState();
+      if (result.currentEntry && !currentState.currentLeagueEntry) {
         setCurrentLeagueEntry({
           leagueId: '',
           queueType: 'RANKED_SOLO_5x5',
@@ -465,159 +456,32 @@ export default function SummonerSearch() {
         });
       }
 
-      const successMsg = `レート履歴を取得しました。${result.rateHistory?.length || 0}件のエントリを保存しました。`;
-      console.log('[SummonerSearch] Success:', successMsg);
-      alert(successMsg);
+      console.log(`[SummonerSearch] Rate history fetched and saved: ${result.rateHistory?.length || 0} entries`);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : '取得に失敗しました';
-      console.error('[SummonerSearch] Fetch rate history error:', error);
-      console.error('[SummonerSearch] Error message:', errorMsg);
-      setError(errorMsg);
-      alert(errorMsg);
-    } finally {
-      setIsSearching(false);
-      setLoading(false);
+      console.warn('[SummonerSearch] Error fetching rate history, but continuing:', error);
+      // Don't throw - we can still use the summoner even if rate history fetch fails
     }
   };
 
-  const handleUpdateRating = async () => {
-    // Always require Riot ID (gameName + tagLine) for update
-    let updateGameName = '';
-    let updateTagLine = '';
-    
-    if (searchMode === 'riotId' && gameName.trim() && tagLine.trim()) {
-      updateGameName = gameName;
-      updateTagLine = tagLine;
-    } else if (currentSummoner) {
-      // If we have current summoner but no Riot ID input, we need to get it
-      // For now, require Riot ID input
-      const errorMsg = 'レート更新にはRiot ID（ゲーム名#タグライン）が必要です。Riot ID検索で検索してから更新してください。';
-      console.error('[SummonerSearch] Update rating error (with currentSummoner):', errorMsg);
-      alert(errorMsg);
-      return;
-    } else {
-      const errorMsg = 'レート更新にはRiot ID（ゲーム名#タグライン）が必要です。Riot ID検索で検索してください。';
-      console.error('[SummonerSearch] Update rating error (no input):', errorMsg);
-      alert(errorMsg);
-      return;
-    }
-
-    setIsSearching(true);
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Get API key from localStorage
-      const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-      const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
-      
-      const body: any = { 
-        region: currentRegion,
-        gameName: updateGameName,
-        tagLine: updateTagLine,
-      };
-      if (apiKey) {
-        body.apiKey = apiKey;
-      }
-
-      const response = await fetch('/api/riot/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        const errorMessage = error.error || 'レートの更新に失敗しました';
-        
-        // Provide more helpful error messages
-        if (response.status === 403) {
-          // Extract API endpoint from error message if available
-          let apiEndpoint = 'GET /lol/league/v4/entries/by-puuid/{encryptedPUUID}';
-          if (errorMessage.includes('エラー発生API:')) {
-            const match = errorMessage.match(/エラー発生API:\s*([^\n]+)/);
-            if (match) {
-              apiEndpoint = match[1].trim();
-            }
-          }
-          throw new Error(`APIキーが無効または権限がありません。\nエラー発生API: ${apiEndpoint}\n右上の「APIキー設定」で正しいAPIキーを設定してください。開発用APIキーは24時間で期限切れになります。`);
-        } else if (response.status === 401 || response.status === 500) {
-          if (errorMessage.includes('not configured')) {
-            throw new Error('APIキーが設定されていません。右上の「APIキー設定」からAPIキーを入力してください。');
-          }
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      
-      // Save to database on client-side
-      if (result.entry) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        
-        // Check if we already have today's data
-        const { rateHistory } = useAppStore.getState();
-        const existing = rateHistory.find(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= today && entryDate < tomorrow;
-        });
-
-        // addRateHistory() now handles duplicate checking internally
-        // It will update existing entry if same date exists, or add new one
-        await useAppStore.getState().addRateHistory({
-          date: new Date(result.entry.date),
-          tier: result.entry.tier,
-          rank: result.entry.rank,
-          lp: result.entry.lp,
-          wins: result.entry.wins,
-          losses: result.entry.losses,
-        });
-      }
-      
-      const successMsg = 'レートを更新しました';
-      console.log('[SummonerSearch] Update rating success:', successMsg);
-      alert(successMsg);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '更新に失敗しました';
-      console.error('[SummonerSearch] Update rating error:', error);
-      console.error('[SummonerSearch] Error message:', errorMessage);
-      setError(errorMessage);
-      alert(errorMessage);
-    } finally {
-      setIsSearching(false);
-      setLoading(false);
-    }
-  };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">サマナー検索</h2>
-      
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
       {currentSummoner && (
-        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900 rounded">
+        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900 rounded">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-lg">現在のサマナー: {currentSummoner.name}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                リージョン: {currentSummoner.region} | レベル: {currentSummoner.summonerLevel}
+              <p className="font-semibold text-base">現在のサマナー: {currentSummoner.name}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {currentSummoner.region} | Lv.{currentSummoner.summonerLevel}
               </p>
             </div>
             {currentLeagueEntry && (
               <div className="text-right">
-                <p className="font-bold text-xl">
+                <p className="font-bold text-lg">
                   {currentLeagueEntry.tier} {currentLeagueEntry.rank}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {currentLeagueEntry.leaguePoints} LP
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {currentLeagueEntry.wins}勝 {currentLeagueEntry.losses}敗
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {currentLeagueEntry.leaguePoints} LP | {currentLeagueEntry.wins}勝 {currentLeagueEntry.losses}敗
                 </p>
               </div>
             )}
@@ -625,105 +489,100 @@ export default function SummonerSearch() {
         </div>
       )}
 
-      <form onSubmit={handleSearch} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-2">検索方法</label>
-          <div className="flex gap-4 mb-4">
-            <label className="flex items-center">
+      <form onSubmit={handleSearch} className="space-y-3">
+        <div className="flex items-center gap-4">
+          <div className="flex gap-3">
+            <label className="flex items-center text-sm">
               <input
                 type="radio"
                 value="riotId"
                 checked={searchMode === 'riotId'}
                 onChange={(e) => setSearchMode(e.target.value as 'riotId')}
-                className="mr-2"
+                className="mr-1.5"
               />
               Riot ID
             </label>
-            <label className="flex items-center">
+            <label className="flex items-center text-sm">
               <input
                 type="radio"
                 value="me"
                 checked={searchMode === 'me'}
                 onChange={(e) => setSearchMode(e.target.value as 'me')}
-                className="mr-2"
+                className="mr-1.5"
               />
               自分のアカウント
             </label>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            {searchMode === 'me' && (
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900 rounded">
-                <p className="text-sm">APIキーで認証された自分のアカウント情報を取得します</p>
-              </div>
-            )}
-            {searchMode === 'riotId' && (
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-sm font-medium mb-1">ゲーム名</label>
-                  <input
-                    type="text"
-                    value={gameName}
-                    onChange={(e) => setGameName(e.target.value)}
-                    placeholder="ゲーム名を入力"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">タグライン</label>
-                  <input
-                    type="text"
-                    value={tagLine}
-                    onChange={(e) => setTagLine(e.target.value)}
-                    placeholder="タグラインを入力（例: JP1）"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            )}
+        {searchMode === 'riotId' && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">ゲーム名</label>
+              <input
+                type="text"
+                value={gameName}
+                onChange={(e) => setGameName(e.target.value)}
+                placeholder="ゲーム名"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">タグライン</label>
+              <input
+                type="text"
+                value={tagLine}
+                onChange={(e) => setTagLine(e.target.value)}
+                placeholder="タグライン"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">リージョン</label>
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="jp1">JP</option>
+                <option value="kr">KR</option>
+                <option value="na1">NA</option>
+                <option value="euw1">EUW</option>
+                <option value="eun1">EUN</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">リージョン</label>
-            <select
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="jp1">JP</option>
-              <option value="kr">KR</option>
-              <option value="na1">NA</option>
-              <option value="euw1">EUW</option>
-              <option value="eun1">EUN</option>
-            </select>
+        )}
+
+        {searchMode === 'me' && (
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <p className="text-xs text-gray-600 dark:text-gray-400">APIキーで認証された自分のアカウント情報を取得します</p>
+            </div>
+            <div className="w-24">
+              <label className="block text-xs font-medium mb-1">リージョン</label>
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="jp1">JP</option>
+                <option value="kr">KR</option>
+                <option value="na1">NA</option>
+                <option value="euw1">EUW</option>
+                <option value="eun1">EUN</option>
+              </select>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={isSearching}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSearching ? '検索中...' : '検索'}
-          </button>
-                 <button
-                   type="button"
-                   onClick={handleUpdateRating}
-                   disabled={isSearching}
-                   className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                 >
-                   {isSearching ? '更新中...' : 'レート更新'}
-                 </button>
-                 <button
-                   type="button"
-                   onClick={handleFetchRateHistory}
-                   disabled={isSearching || !currentSummoner}
-                   className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                 >
-                   {isSearching ? '取得中...' : '戦歴から取得'}
-                 </button>
-        </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSearching}
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          {isSearching ? '検索中...' : '検索'}
+        </button>
       </form>
     </div>
   );
