@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   LineChart,
   Line,
@@ -37,6 +37,8 @@ export default function RateChart() {
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
   const [movingAverageWindow, setMovingAverageWindow] = useState<number>(7);
+  const [yAxisZoom, setYAxisZoom] = useState<{ min: number; max: number } | null>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
   
   // Reset brush when timeRange changes
   const handleTimeRangeChange = (newRange: TimeRange) => {
@@ -113,14 +115,28 @@ export default function RateChart() {
 
     // Add goal lines for all goals
     // Store goal data separately for rendering multiple goal lines
-    const goalData = goals.map(goal => ({
+    const goalData = (Array.isArray(goals) ? goals : []).map(goal => ({
       goal,
       goalLP: tierRankToLP(goal.targetTier, goal.targetRank, goal.targetLP),
       targetDate: new Date(goal.targetDate).getTime(),
     })).sort((a, b) => a.targetDate - b.targetDate);
 
+    // Add goal date points to ensure X-axis extends to goal dates
+    const goalDatePoints: (ChartDataPoint & { dateTime: number })[] = Array.isArray(goalData) ? goalData.map((goalItem) => {
+      const goalDate = new Date(goalItem.targetDate);
+      const month = goalDate.getMonth() + 1;
+      const day = goalDate.getDate();
+      const dateStr = `${month}/${day}`;
+      return {
+        date: dateStr,
+        dateValue: goalItem.targetDate,
+        dateTime: goalItem.targetDate,
+        lp: NaN, // No LP value, just for X-axis extension
+      };
+    }) : [];
+
     // Combine and sort by dateTime
-    const combined = [...dataPoints, ...predictionPoints].sort((a, b) => a.dateTime - b.dateTime);
+    const combined = [...(Array.isArray(dataPoints) ? dataPoints : []), ...(Array.isArray(predictionPoints) ? predictionPoints : []), ...goalDatePoints].sort((a, b) => a.dateTime - b.dateTime);
     
     // Remove dateTime before returning (not needed for chart, but keep dateValue)
     const finalData = combined.map(({ dateTime, originalEntry, ...rest }) => rest);
@@ -202,7 +218,11 @@ export default function RateChart() {
     const roundedMin = Math.floor((minLP - padding) / 25) * 25;
     const roundedMax = Math.ceil((maxLP + padding) / 25) * 25;
     
-    const yAxisDomain = [Math.max(0, roundedMin), roundedMax];
+    // Use zoom state if available, otherwise use calculated domain
+    const baseYAxisDomain = [Math.max(0, roundedMin), roundedMax];
+    const yAxisDomain = yAxisZoom 
+      ? [Math.max(0, yAxisZoom.min), yAxisZoom.max]
+      : baseYAxisDomain;
     
     // Generate Y-axis ticks based on data range
     const generateYTicks = () => {
@@ -303,7 +323,85 @@ export default function RateChart() {
       brushEndIndex: brushEnd,
       goalData,
     };
-  }, [rateHistory, goals, timeRange, movingAverageWindow]);
+  }, [rateHistory, goals, timeRange, movingAverageWindow, yAxisZoom]);
+
+  // Handle Y-axis zoom (defined after chartData)
+  const handleYAxisZoom = useCallback((zoomIn: boolean) => {
+    if (!chartData.yAxisDomain || !Array.isArray(chartData.yAxisDomain)) return;
+    
+    // Get current domain: use yAxisZoom if set, otherwise use chartData.yAxisDomain
+    let currentMin: number;
+    let currentMax: number;
+    if (yAxisZoom) {
+      currentMin = yAxisZoom.min;
+      currentMax = yAxisZoom.max;
+    } else {
+      [currentMin, currentMax] = chartData.yAxisDomain;
+    }
+    
+    const currentRange = currentMax - currentMin;
+    const center = (currentMin + currentMax) / 2;
+    const zoomFactor = 0.1; // 10% zoom per action
+    
+    let newRange: number;
+    if (zoomIn) {
+      // Zoom in
+      newRange = currentRange * (1 - zoomFactor);
+    } else {
+      // Zoom out
+      newRange = currentRange * (1 + zoomFactor);
+    }
+    
+    // Limit zoom range (min 50 LP, max 5000 LP)
+    const minRange = 50;
+    const maxRange = 5000;
+    newRange = Math.max(minRange, Math.min(maxRange, newRange));
+    
+    const newMin = Math.max(0, center - newRange / 2);
+    const newMax = center + newRange / 2;
+    
+    setYAxisZoom({ min: newMin, max: newMax });
+  }, [chartData.yAxisDomain, yAxisZoom]);
+
+  // Handle keyboard events for numpad +/-
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if numpad + or - is pressed
+      if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+        // Zoom in
+        handleYAxisZoom(true);
+      } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') {
+        // Zoom out
+        handleYAxisZoom(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleYAxisZoom]);
+
+  // Handle mouse wheel on chart container
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Only handle if mouse is over the chart area
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const delta = e.deltaY;
+      const zoomIn = delta < 0; // Scroll up = zoom in
+      handleYAxisZoom(zoomIn);
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleYAxisZoom]);
 
   if (rateHistory.length === 0) {
     return (
@@ -336,9 +434,20 @@ export default function RateChart() {
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">日</span>
           </div>
+          <button
+            onClick={() => setYAxisZoom(null)}
+            disabled={!yAxisZoom}
+            className="px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            title="Y軸のズームをリセット"
+          >
+            Y軸リセット
+          </button>
           <select
             value={timeRange}
-            onChange={(e) => handleTimeRangeChange(e.target.value as TimeRange)}
+            onChange={(e) => {
+              handleTimeRangeChange(e.target.value as TimeRange);
+              setYAxisZoom(null); // Reset zoom when time range changes
+            }}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">無限</option>
@@ -369,7 +478,8 @@ export default function RateChart() {
           </button>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={600}>
+      <div ref={chartContainerRef} className="w-full">
+        <ResponsiveContainer width="100%" height={600}>
         <LineChart data={chartData.data} margin={{ top: 5, right: 30, left: 80, bottom: 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
@@ -381,7 +491,7 @@ export default function RateChart() {
             height={80}
           />
           <YAxis 
-            domain={chartData.yAxisDomain}
+            domain={yAxisZoom ? [yAxisZoom.min, yAxisZoom.max] : chartData.yAxisDomain}
             ticks={chartData.yAxisTicks}
             tickFormatter={(value: number) => {
               if (isNaN(value)) return '';
@@ -467,7 +577,7 @@ export default function RateChart() {
             dot={false}
             connectNulls={false}
           />
-          {chartData.goalData.map((goalItem, index) => {
+          {Array.isArray(chartData.goalData) && chartData.goalData.map((goalItem, index) => {
             // Find the data point closest to the goal date
             let closestDateStr = '';
             let minDiff = Infinity;
@@ -536,7 +646,8 @@ export default function RateChart() {
             }}
           />
         </LineChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
