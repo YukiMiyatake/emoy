@@ -209,11 +209,16 @@ export class RiotApiClient {
   /**
    * Get league entries by PUUID
    * Uses /lol/league/v4/entries/by-puuid/{encryptedPUUID}
-   * Note: encryptedPUUID is the puuid itself
+   * Note: encryptedPUUID is the puuid itself (NOT summonerId)
    */
   async getLeagueEntriesByPuuid(puuid: string): Promise<LeagueEntry[]> {
+    // Use puuid directly as encryptedPUUID (NOT summonerId)
     const url = `${this.getBaseUrl()}/lol/league/v4/entries/by-puuid/${puuid}`;
+    console.log('[RiotApiClient] getLeagueEntriesByPuuid - puuid (encryptedPUUID):', puuid);
+    console.log('[RiotApiClient] getLeagueEntriesByPuuid - API URL:', url);
     const data = await this.fetchRiotApi<LeagueEntry[]>(url, `GET /lol/league/v4/entries/by-puuid/{encryptedPUUID}`);
+    console.log('[RiotApiClient] getLeagueEntriesByPuuid - League entries count:', data.length);
+    console.log('[RiotApiClient] getLeagueEntriesByPuuid - League entries:', JSON.stringify(data, null, 2));
     return data;
   }
 

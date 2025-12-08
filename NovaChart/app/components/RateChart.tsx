@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   LineChart,
   Line,
@@ -15,7 +15,7 @@ import {
 import { useAppStore } from '@/lib/store/useAppStore';
 import { tierRankToLP } from '@/lib/riot/client';
 import { calculateMovingAverage, generatePredictionPoints } from '@/lib/analytics/prediction';
-import { Goal } from '@/types';
+import { Goal, RateHistory } from '@/types';
 
 interface ChartDataPoint {
   date: string;
@@ -25,15 +25,54 @@ interface ChartDataPoint {
   goalLP?: number;
 }
 
+type TimeRange = 'all' | '5years' | '1year' | '1month' | '1week';
+
 export default function RateChart() {
   const { rateHistory, goals } = useAppStore();
+  const [timeRange, setTimeRange] = useState<TimeRange>('all');
 
-  const chartData = useMemo(() => {
+  // Filter rate history by time range
+  const filteredRateHistory = useMemo(() => {
     if (rateHistory.length === 0) {
       return [];
     }
 
-    const sorted = [...rateHistory].sort(
+    if (timeRange === 'all') {
+      return rateHistory;
+    }
+
+    const now = new Date();
+    let startDate: Date;
+
+    switch (timeRange) {
+      case '5years':
+        startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+        break;
+      case '1year':
+        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      case '1month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case '1week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        return rateHistory;
+    }
+
+    return rateHistory.filter((entry) => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= startDate;
+    });
+  }, [rateHistory, timeRange]);
+
+  const chartData = useMemo(() => {
+    if (filteredRateHistory.length === 0) {
+      return [];
+    }
+
+    const sorted = [...filteredRateHistory].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -72,7 +111,7 @@ export default function RateChart() {
 
     // Combine data points with prediction points
     return [...dataPoints, ...predictionPoints];
-  }, [rateHistory, goals]);
+  }, [filteredRateHistory, goals]);
 
   if (rateHistory.length === 0) {
     return (
@@ -85,7 +124,27 @@ export default function RateChart() {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">レート推移</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold">レート推移</h2>
+        <div className="flex gap-2">
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">無限</option>
+            <option value="5years">5年</option>
+            <option value="1year">1年</option>
+            <option value="1month">1か月</option>
+            <option value="1week">1週間</option>
+          </select>
+        </div>
+      </div>
+      {filteredRateHistory.length === 0 && rateHistory.length > 0 && (
+        <p className="text-sm text-gray-500 mb-4">
+          選択した期間にデータがありません。期間を変更してください。
+        </p>
+      )}
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />

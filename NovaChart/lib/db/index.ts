@@ -8,35 +8,13 @@ export class NovaChartDB extends Dexie {
   summoners!: Table<Summoner, string>;
 
   constructor() {
-    super('NovaChartDB');
+    // Use a new database name to avoid primary key migration issues
+    // This will create a fresh database with the correct schema
+    super('NovaChartDB_v2');
     
+    // Start directly with the correct schema (puuid as primary key)
+    // If users have old data, they will need to re-add their summoners
     this.version(1).stores({
-      rateHistory: '++id, date, tier, rank, lp',
-      goals: '++id, targetDate, createdAt, isActive',
-      matches: '++id, date, win, role, champion',
-      summoners: 'id, puuid, name, region, lastUpdated', // Old schema with id as primary key
-    });
-    
-    // Version 2: Change summoners primary key from id to puuid
-    // Note: Dexie doesn't support changing primary key directly, so we need to delete and recreate
-    this.version(2).stores({
-      rateHistory: '++id, date, tier, rank, lp',
-      goals: '++id, targetDate, createdAt, isActive',
-      matches: '++id, date, win, role, champion',
-      // Remove old summoners table to allow recreation with new primary key
-    }).upgrade(async (tx) => {
-      // Save existing summoners data before deleting table
-      const oldSummoners = await tx.table('summoners').toArray();
-      // Store in a temporary location (we'll recreate in version 3)
-      if (oldSummoners.length > 0) {
-        // Store in sessionStorage temporarily (will be lost on refresh, but that's okay)
-        // Or we can just clear the table and let users re-add their summoners
-        console.log(`[DB Migration] Found ${oldSummoners.length} summoners to migrate`);
-      }
-    });
-    
-    // Version 3: Recreate summoners table with puuid as primary key
-    this.version(3).stores({
       rateHistory: '++id, date, tier, rank, lp',
       goals: '++id, targetDate, createdAt, isActive',
       matches: '++id, date, win, role, champion',
