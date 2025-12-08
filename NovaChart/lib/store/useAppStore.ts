@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { RateHistory, Goal, Match, Summoner } from '@/types';
+import { RateHistory, Goal, Match, Summoner, LeagueEntry } from '@/types';
 import { rateHistoryService, goalService, matchService, summonerService } from '@/lib/db';
 
 interface AppState {
@@ -7,6 +7,7 @@ interface AppState {
   goals: Goal[];
   matches: Match[];
   currentSummoner: Summoner | null;
+  currentLeagueEntry: LeagueEntry | null; // Added
   isLoading: boolean;
   error: string | null;
 
@@ -18,6 +19,7 @@ interface AppState {
   loadMatches: () => Promise<void>;
   addMatch: (match: Omit<Match, 'id'>) => Promise<void>;
   setCurrentSummoner: (summoner: Summoner | null) => void;
+  setCurrentLeagueEntry: (entry: LeagueEntry | null) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 }
@@ -27,6 +29,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   goals: [],
   matches: [],
   currentSummoner: null,
+  currentLeagueEntry: null,
   isLoading: false,
   error: null,
 
@@ -110,6 +113,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setCurrentSummoner: (summoner) => {
     set({ currentSummoner: summoner });
+  },
+
+  setCurrentLeagueEntry: (entry) => {
+    set({ currentLeagueEntry: entry });
   },
 
   setError: (error) => {

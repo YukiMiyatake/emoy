@@ -10,7 +10,7 @@ const GAME_NAME_STORAGE_KEY = 'riot_game_name';
 const TAG_LINE_STORAGE_KEY = 'riot_tag_line';
 
 export default function SummonerSearch() {
-  const { setCurrentSummoner, setLoading, setError, currentSummoner } = useAppStore();
+  const { setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, currentSummoner, currentLeagueEntry } = useAppStore();
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [region, setRegion] = useState('jp1');
@@ -114,6 +114,20 @@ export default function SummonerSearch() {
           console.log('[SummonerSearch] Processed summoner:', summoner);
           
           setCurrentSummoner(summoner);
+          
+          // Fetch league entry to display current rank
+          try {
+            const leagueResponse = await fetch(`/api/riot/league-by-puuid?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
+            if (leagueResponse.ok) {
+              const leagueData = await leagueResponse.json();
+              if (leagueData.entry) {
+                setCurrentLeagueEntry(leagueData.entry);
+              }
+            }
+          } catch (error) {
+            console.error('[SummonerSearch] Failed to fetch league entry (from /me):', error);
+            // Don't throw - we can still use the summoner even if league fetch fails
+          }
           
           // Save to database on client-side
           try {
@@ -221,6 +235,20 @@ export default function SummonerSearch() {
           console.log('[SummonerSearch] Processed summoner:', summoner);
           
           setCurrentSummoner(summoner);
+          
+          // Fetch league entry to display current rank
+          try {
+            const leagueResponse = await fetch(`/api/riot/league-by-puuid?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
+            if (leagueResponse.ok) {
+              const leagueData = await leagueResponse.json();
+              if (leagueData.entry) {
+                setCurrentLeagueEntry(leagueData.entry);
+              }
+            }
+          } catch (error) {
+            console.error('[SummonerSearch] Failed to fetch league entry:', error);
+            // Don't throw - we can still use the summoner even if league fetch fails
+          }
           
           // Save to database on client-side
           try {
@@ -420,11 +448,27 @@ export default function SummonerSearch() {
       
       {currentSummoner && (
         <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900 rounded">
-          <p className="font-semibold">現在のサマナー:</p>
-          <p>{currentSummoner.name}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            リージョン: {currentSummoner.region} | レベル: {currentSummoner.summonerLevel}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-lg">現在のサマナー: {currentSummoner.name}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                リージョン: {currentSummoner.region} | レベル: {currentSummoner.summonerLevel}
+              </p>
+            </div>
+            {currentLeagueEntry && (
+              <div className="text-right">
+                <p className="font-bold text-xl">
+                  {currentLeagueEntry.tier} {currentLeagueEntry.rank}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {currentLeagueEntry.leaguePoints} LP
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {currentLeagueEntry.wins}勝 {currentLeagueEntry.losses}敗
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
