@@ -115,11 +115,90 @@ export default function RateChart() {
 
     // Add goal lines for all goals
     // Store goal data separately for rendering multiple goal lines
-    const goalData = (Array.isArray(goals) ? goals : []).map(goal => ({
-      goal,
-      goalLP: tierRankToLP(goal.targetTier, goal.targetRank, goal.targetLP),
-      targetDate: new Date(goal.targetDate).getTime(),
-    })).sort((a, b) => a.targetDate - b.targetDate);
+    const sortedGoals = (Array.isArray(goals) ? goals : []).sort((a, b) => 
+      new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime()
+    );
+    
+    const goalData = sortedGoals.map((goal, index) => {
+      const goalLP = tierRankToLP(goal.targetTier, goal.targetRank, goal.targetLP);
+      const targetDate = new Date(goal.targetDate).getTime();
+      
+      // Calculate start point
+      let startDate: number;
+      let startLP: number;
+      
+      if (index === 0) {
+        // First goal: start from createdAt date and current rate at that time
+        const createdAt = new Date(goal.createdAt).getTime();
+        startDate = createdAt;
+        
+        // Find the rate at createdAt (or closest before it)
+        // Filter entries before or equal to createdAt, then get the latest one
+        const entriesBeforeCreatedAt = sorted.filter(e => new Date(e.date).getTime() <= createdAt);
+        let closestEntry: RateHistory | undefined;
+        
+        if (entriesBeforeCreatedAt.length > 0) {
+          // Get the latest entry before or equal to createdAt
+          closestEntry = entriesBeforeCreatedAt[entriesBeforeCreatedAt.length - 1];
+        } else if (sorted.length > 0) {
+          // If no entry before createdAt, use the first entry (earliest available)
+          closestEntry = sorted[0];
+        }
+        
+        if (closestEntry) {
+          startLP = tierRankToLP(closestEntry.tier, closestEntry.rank, closestEntry.lp);
+        } else {
+          // Fallback: use 0 if no history at all
+          startLP = 0;
+        }
+      } else {
+        // Subsequent goals: start from previous goal's target date and LP
+        const prevGoal = sortedGoals[index - 1];
+        startDate = new Date(prevGoal.targetDate).getTime();
+        startLP = tierRankToLP(prevGoal.targetTier, prevGoal.targetRank, prevGoal.targetLP);
+      }
+      
+      return {
+        goal,
+        goalLP,
+        targetDate,
+        startDate,
+        startLP,
+      };
+    });
+
+    // Add goal line data points (start and end points for each goal)
+    const goalLinePoints: (ChartDataPoint & { dateTime: number; goalIndex?: number })[] = [];
+    goalData.forEach((goalItem, index) => {
+      const startDate = new Date(goalItem.startDate);
+      const endDate = new Date(goalItem.targetDate);
+      const startMonth = startDate.getMonth() + 1;
+      const startDay = startDate.getDate();
+      const endMonth = endDate.getMonth() + 1;
+      const endDay = endDate.getDate();
+      const startDateStr = `${startMonth}/${startDay}`;
+      const endDateStr = `${endMonth}/${endDay}`;
+      
+      // Add start point
+      goalLinePoints.push({
+        date: startDateStr,
+        dateValue: goalItem.startDate,
+        dateTime: goalItem.startDate,
+        lp: NaN,
+        [`goalLineLP_${index}`]: goalItem.startLP,
+        goalIndex: index,
+      });
+      
+      // Add end point
+      goalLinePoints.push({
+        date: endDateStr,
+        dateValue: goalItem.targetDate,
+        dateTime: goalItem.targetDate,
+        lp: NaN,
+        [`goalLineLP_${index}`]: goalItem.goalLP,
+        goalIndex: index,
+      });
+    });
 
     // Add goal date points to ensure X-axis extends to goal dates
     const goalDatePoints: (ChartDataPoint & { dateTime: number })[] = Array.isArray(goalData) ? goalData.map((goalItem) => {
@@ -136,7 +215,7 @@ export default function RateChart() {
     }) : [];
 
     // Combine and sort by dateTime
-    const combined = [...(Array.isArray(dataPoints) ? dataPoints : []), ...(Array.isArray(predictionPoints) ? predictionPoints : []), ...goalDatePoints].sort((a, b) => a.dateTime - b.dateTime);
+    const combined = [...(Array.isArray(dataPoints) ? dataPoints : []), ...(Array.isArray(predictionPoints) ? predictionPoints : []), ...goalDatePoints, ...goalLinePoints].sort((a, b) => a.dateTime - b.dateTime);
     
     // Remove dateTime before returning (not needed for chart, but keep dateValue)
     const finalData = combined.map(({ dateTime, originalEntry, ...rest }) => rest);
@@ -193,72 +272,10 @@ export default function RateChart() {
       xAxisDomain = [domainStart, domainEnd];
     }
     
-    // Calculate Y-axis domain (min and max LP values)
-    const lpValues = finalData
-      .map(d => d.lp)
-      .filter(lp => !isNaN(lp));
-    
-    if (lpValues.length === 0) {
-      return { 
-        data: finalData, 
-        yAxisDomain: [0, 2800], 
-        yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800],
-        xAxisDomain,
-      };
-    }
-    
-    const minLP = Math.min(...lpValues);
-    const maxLP = Math.max(...lpValues);
-    const range = maxLP - minLP;
-    
-    // Calculate appropriate padding (5% of range, minimum 20) - reduced padding for tighter fit
-    const padding = Math.max(20, range * 0.05);
-    
-    // Round down min and round up max to nearest 25 for cleaner display
-    const roundedMin = Math.floor((minLP - padding) / 25) * 25;
-    const roundedMax = Math.ceil((maxLP + padding) / 25) * 25;
-    
-    // Use zoom state if available, otherwise use calculated domain
-    const baseYAxisDomain = [Math.max(0, roundedMin), roundedMax];
-    const yAxisDomain = yAxisZoom 
-      ? [Math.max(0, yAxisZoom.min), yAxisZoom.max]
-      : baseYAxisDomain;
-    
-    // Generate Y-axis ticks based on data range
-    const generateYTicks = () => {
-      const ticks: number[] = [];
-      const domainRange = roundedMax - roundedMin;
-      
-      // Determine tick interval based on range
-      let tickInterval: number;
-      if (domainRange <= 200) {
-        tickInterval = 25; // Small range: every 25 LP
-      } else if (domainRange <= 500) {
-        tickInterval = 50; // Medium range: every 50 LP
-      } else if (domainRange <= 1000) {
-        tickInterval = 100; // Large range: every 100 LP (rank boundaries)
-      } else {
-        tickInterval = 200; // Very large range: every 200 LP
-      }
-      
-      // Generate ticks at appropriate intervals
-      let currentTick = Math.ceil(roundedMin / tickInterval) * tickInterval;
-      while (currentTick <= roundedMax) {
-        ticks.push(currentTick);
-        currentTick += tickInterval;
-      }
-      
-      // Ensure we have at least 3 ticks
-      if (ticks.length < 3) {
-        const midPoint = (roundedMin + roundedMax) / 2;
-        ticks.push(Math.round(midPoint / tickInterval) * tickInterval);
-        ticks.sort((a, b) => a - b);
-      }
-      
-      return ticks;
-    };
-    
-    const yAxisTicks = generateYTicks();
+    // Y-axis calculation will be done separately based on displayed data range
+    // Return placeholder values here, will be calculated in separate useMemo
+    const yAxisDomain: [number, number] = [0, 2800];
+    const yAxisTicks: number[] = [0, 400, 800, 1200, 1600, 2000, 2400, 2800];
     
     // Calculate brush start/end indices based on time range
     // When time range is not 'all', show the most recent data (right side)
@@ -325,18 +342,167 @@ export default function RateChart() {
     };
   }, [rateHistory, goals, timeRange, movingAverageWindow, yAxisZoom]);
 
-  // Handle Y-axis zoom (defined after chartData)
+  // Calculate Y-axis based on displayed data range (Brush selection)
+  const yAxisConfig = useMemo(() => {
+    if (!chartData.data || chartData.data.length === 0) {
+      return {
+        yAxisDomain: [0, 2800] as [number, number],
+        yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800],
+      };
+    }
+
+    // Determine displayed data range based on Brush selection
+    const displayedStart = brushStartIndex !== undefined ? brushStartIndex : (chartData.brushStartIndex !== undefined ? chartData.brushStartIndex : 0);
+    const displayedEnd = brushEndIndex !== undefined ? brushEndIndex : (chartData.brushEndIndex !== undefined ? chartData.brushEndIndex : chartData.data.length - 1);
+    const displayedData = chartData.data.slice(displayedStart, displayedEnd + 1);
+
+    // Get LP values from displayed data
+    const lpValues = displayedData
+      .map(d => (d as any).lp)
+      .filter((lp: any) => !isNaN(lp) && lp !== undefined);
+
+    // Add goal LP values that fall within the displayed date range
+    const goalLPValues: number[] = [];
+    if (displayedData.length > 0 && chartData.goalData) {
+      const displayedStartDate = (displayedData[0] as any).dateValue;
+      const displayedEndDate = (displayedData[displayedData.length - 1] as any).dateValue;
+
+      chartData.goalData.forEach((goalItem: any) => {
+        const goalStartDate = goalItem.startDate;
+        const goalTargetDate = goalItem.targetDate;
+
+        // Include goal if the goal line intersects with the displayed range
+        // The goal line goes from goalStartDate to goalTargetDate
+        // We include it if:
+        // 1. The goal line starts or ends within the displayed range, OR
+        // 2. The goal line completely spans the displayed range
+        const goalLineIntersects = 
+          (goalStartDate >= displayedStartDate && goalStartDate <= displayedEndDate) ||
+          (goalTargetDate >= displayedStartDate && goalTargetDate <= displayedEndDate) ||
+          (goalStartDate <= displayedStartDate && goalTargetDate >= displayedEndDate);
+
+        if (goalLineIntersects) {
+          // Calculate LP values at the intersection points with displayed range
+          // Goal line: LP = startLP + (goalLP - startLP) * (date - startDate) / (targetDate - startDate)
+          const goalDateRange = goalTargetDate - goalStartDate;
+          
+          if (goalDateRange === 0) {
+            // Goal has no date range (shouldn't happen, but handle it)
+            if (goalStartDate >= displayedStartDate && goalStartDate <= displayedEndDate) {
+              goalLPValues.push(goalItem.startLP);
+              goalLPValues.push(goalItem.goalLP);
+            }
+          } else {
+            // Calculate LP at displayed range boundaries
+            const lpAtDisplayedStart = goalStartDate <= displayedStartDate && goalTargetDate >= displayedStartDate
+              ? goalItem.startLP + (goalItem.goalLP - goalItem.startLP) * (displayedStartDate - goalStartDate) / goalDateRange
+              : null;
+            const lpAtDisplayedEnd = goalStartDate <= displayedEndDate && goalTargetDate >= displayedEndDate
+              ? goalItem.startLP + (goalItem.goalLP - goalItem.startLP) * (displayedEndDate - goalStartDate) / goalDateRange
+              : null;
+            
+            // Include LP values that are within the displayed range
+            if (goalStartDate >= displayedStartDate && goalStartDate <= displayedEndDate) {
+              // Goal starts within displayed range
+              goalLPValues.push(goalItem.startLP);
+            }
+            if (goalTargetDate >= displayedStartDate && goalTargetDate <= displayedEndDate) {
+              // Goal ends within displayed range
+              goalLPValues.push(goalItem.goalLP);
+            }
+            if (lpAtDisplayedStart !== null) {
+              goalLPValues.push(lpAtDisplayedStart);
+            }
+            if (lpAtDisplayedEnd !== null) {
+              goalLPValues.push(lpAtDisplayedEnd);
+            }
+          }
+        }
+      });
+    }
+
+    // Combine all LP values (rate history + goals)
+    const allLPValues = [...lpValues, ...goalLPValues];
+
+    if (allLPValues.length === 0) {
+      return {
+        yAxisDomain: [0, 2800] as [number, number],
+        yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800],
+      };
+    }
+
+    const minLP = Math.min(...allLPValues);
+    const maxLP = Math.max(...allLPValues);
+    const range = maxLP - minLP;
+
+    // Calculate appropriate padding (5% of range, minimum 20)
+    const padding = Math.max(20, range * 0.05);
+
+    // Round down min and round up max to nearest 25 for cleaner display
+    const roundedMin = Math.floor((minLP - padding) / 25) * 25;
+    const roundedMax = Math.ceil((maxLP + padding) / 25) * 25;
+
+    // Use zoom state if available, otherwise use calculated domain
+    const baseYAxisDomain: [number, number] = [Math.max(0, roundedMin), roundedMax];
+    const yAxisDomain = yAxisZoom 
+      ? [Math.max(0, yAxisZoom.min), yAxisZoom.max] as [number, number]
+      : baseYAxisDomain;
+
+    // Generate Y-axis ticks based on the actual display range (yAxisDomain)
+    const generateYTicks = () => {
+      const ticks: number[] = [];
+      const [domainMin, domainMax] = yAxisDomain;
+      const domainRange = domainMax - domainMin;
+
+      // Determine tick interval based on range
+      let tickInterval: number;
+      if (domainRange <= 200) {
+        tickInterval = 25; // Small range: every 25 LP
+      } else if (domainRange <= 500) {
+        tickInterval = 50; // Medium range: every 50 LP
+      } else if (domainRange <= 1000) {
+        tickInterval = 100; // Large range: every 100 LP (rank boundaries)
+      } else {
+        tickInterval = 200; // Very large range: every 200 LP
+      }
+
+      // Generate ticks at appropriate intervals within the display range
+      let currentTick = Math.ceil(domainMin / tickInterval) * tickInterval;
+      while (currentTick <= domainMax) {
+        ticks.push(currentTick);
+        currentTick += tickInterval;
+      }
+
+      // Ensure we have at least 3 ticks
+      if (ticks.length < 3) {
+        const midPoint = (domainMin + domainMax) / 2;
+        ticks.push(Math.round(midPoint / tickInterval) * tickInterval);
+        ticks.sort((a, b) => a - b);
+      }
+
+      return ticks;
+    };
+
+    const yAxisTicks = generateYTicks();
+
+    return {
+      yAxisDomain,
+      yAxisTicks,
+    };
+  }, [chartData, brushStartIndex, brushEndIndex, yAxisZoom]);
+
+  // Handle Y-axis zoom (defined after chartData and yAxisConfig)
   const handleYAxisZoom = useCallback((zoomIn: boolean) => {
-    if (!chartData.yAxisDomain || !Array.isArray(chartData.yAxisDomain)) return;
+    if (!yAxisConfig.yAxisDomain || !Array.isArray(yAxisConfig.yAxisDomain)) return;
     
-    // Get current domain: use yAxisZoom if set, otherwise use chartData.yAxisDomain
+    // Get current domain: use yAxisZoom if set, otherwise use yAxisConfig.yAxisDomain
     let currentMin: number;
     let currentMax: number;
     if (yAxisZoom) {
       currentMin = yAxisZoom.min;
       currentMax = yAxisZoom.max;
     } else {
-      [currentMin, currentMax] = chartData.yAxisDomain;
+      [currentMin, currentMax] = yAxisConfig.yAxisDomain;
     }
     
     const currentRange = currentMax - currentMin;
@@ -361,7 +527,7 @@ export default function RateChart() {
     const newMax = center + newRange / 2;
     
     setYAxisZoom({ min: newMin, max: newMax });
-  }, [chartData.yAxisDomain, yAxisZoom]);
+  }, [yAxisConfig.yAxisDomain, yAxisZoom]);
 
   // Handle keyboard events for numpad +/-
   useEffect(() => {
@@ -491,8 +657,8 @@ export default function RateChart() {
             height={80}
           />
           <YAxis 
-            domain={yAxisZoom ? [yAxisZoom.min, yAxisZoom.max] : chartData.yAxisDomain}
-            ticks={chartData.yAxisTicks}
+            domain={yAxisConfig.yAxisDomain}
+            ticks={yAxisConfig.yAxisTicks}
             tickFormatter={(value: number) => {
               if (isNaN(value)) return '';
               const tierRank = lpToTierRank(value);
@@ -577,42 +743,21 @@ export default function RateChart() {
             dot={false}
             connectNulls={false}
           />
-          {Array.isArray(chartData.goalData) && chartData.goalData.map((goalItem, index) => {
-            // Find the data point closest to the goal date
-            let closestDateStr = '';
-            let minDiff = Infinity;
-            
-            chartData.data.forEach(d => {
-              const diff = Math.abs(d.dateValue - goalItem.targetDate);
-              if (diff < minDiff) {
-                minDiff = diff;
-                closestDateStr = d.date;
-              }
-            });
-            
-            // If no data point found, create a date string from goal date
-            if (!closestDateStr) {
-              const goalDate = new Date(goalItem.targetDate);
-              closestDateStr = `${goalDate.getMonth() + 1}/${goalDate.getDate()}`;
-            }
-            
-            return (
-              <ReferenceLine
-                key={goalItem.goal.id || index}
-                x={closestDateStr}
-                y={goalItem.goalLP}
-                stroke="#ef4444"
-                strokeWidth={2}
-                strokeDasharray="10 5"
-                label={{
-                  value: `${goalItem.goal.targetTier} ${goalItem.goal.targetRank} ${goalItem.goal.targetLP}LP`,
-                  position: 'top',
-                  fill: '#ef4444',
-                  fontSize: 12,
-                }}
-              />
-            );
-          })}
+          {Array.isArray(chartData.goalData) && chartData.goalData.map((goalItem, index) => (
+            <Line
+              key={goalItem.goal.id || index}
+              type="linear"
+              dataKey={`goalLineLP_${index}`}
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="10 5"
+              dot={{ fill: '#ef4444', r: 4 }}
+              activeDot={{ r: 6 }}
+              connectNulls={true}
+              isAnimationActive={false}
+              name={`目標${index + 1}: ${goalItem.goal.targetTier} ${goalItem.goal.targetRank} ${goalItem.goal.targetLP}LP`}
+            />
+          ))}
           <Brush
             dataKey="date"
             height={30}
