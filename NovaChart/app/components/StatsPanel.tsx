@@ -5,12 +5,28 @@ import { useAppStore } from '@/lib/store/useAppStore';
 import { calculateStatistics, calculateProgress, calculateRequiredMatches } from '@/lib/analytics/progress';
 
 export default function StatsPanel() {
-  const { rateHistory, goals, matches } = useAppStore();
+  const { rateHistory, goals, matches, currentLeagueEntry } = useAppStore();
 
-  const stats = calculateStatistics(rateHistory);
+  // Filter rateHistory to only include solo queue (RANKED_SOLO_5x5) data
+  // Since RateHistory doesn't have queueType, we'll use currentLeagueEntry for current stats
+  // and filter rateHistory based on the assumption that it's mostly solo queue data
+  // For now, we'll use currentLeagueEntry for wins/losses/winRate and rateHistory for LP changes
+  const soloQueueRateHistory = rateHistory; // Assume all rateHistory is solo queue for now
+  
+  // Extract only needed fields from currentLeagueEntry to avoid passing the full object
+  const leagueEntryForStats = currentLeagueEntry ? {
+    queueType: currentLeagueEntry.queueType,
+    wins: currentLeagueEntry.wins,
+    losses: currentLeagueEntry.losses,
+    tier: currentLeagueEntry.tier,
+    rank: currentLeagueEntry.rank,
+    leaguePoints: currentLeagueEntry.leaguePoints,
+  } : null;
+  
+  const stats = calculateStatistics(soloQueueRateHistory, leagueEntryForStats);
   const activeGoal = goals.find(g => g.isActive);
-  const progress = activeGoal ? calculateProgress(rateHistory, activeGoal) : null;
-  const requiredMatches = activeGoal ? calculateRequiredMatches(rateHistory, matches, activeGoal) : null;
+  const progress = activeGoal ? calculateProgress(soloQueueRateHistory, activeGoal) : null;
+  const requiredMatches = activeGoal ? calculateRequiredMatches(soloQueueRateHistory, matches, activeGoal, 3, leagueEntryForStats) : null;
 
   if (!stats) {
     return (

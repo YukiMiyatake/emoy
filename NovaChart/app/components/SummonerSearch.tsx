@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { Summoner } from '@/types';
+import { Summoner, LeagueEntry } from '@/types';
 
 const API_KEY_STORAGE_KEY = 'riot_api_key';
 const API_REGION_STORAGE_KEY = 'riot_api_region';
@@ -121,7 +121,21 @@ export default function SummonerSearch() {
             if (leagueResponse.ok) {
               const leagueData = await leagueResponse.json();
               if (leagueData.entry) {
-                setCurrentLeagueEntry(leagueData.entry);
+                // Extract only LeagueEntry fields to avoid including extra fields
+                const entry: LeagueEntry = {
+                  leagueId: leagueData.entry.leagueId || '',
+                  queueType: leagueData.entry.queueType || '',
+                  tier: leagueData.entry.tier || '',
+                  rank: leagueData.entry.rank || '',
+                  leaguePoints: leagueData.entry.leaguePoints || 0,
+                  wins: leagueData.entry.wins || 0,
+                  losses: leagueData.entry.losses || 0,
+                  veteran: leagueData.entry.veteran || false,
+                  inactive: leagueData.entry.inactive || false,
+                  freshBlood: leagueData.entry.freshBlood || false,
+                  hotStreak: leagueData.entry.hotStreak || false,
+                };
+                setCurrentLeagueEntry(entry);
               }
             }
           } catch (error) {
@@ -242,7 +256,21 @@ export default function SummonerSearch() {
             if (leagueResponse.ok) {
               const leagueData = await leagueResponse.json();
               if (leagueData.entry) {
-                setCurrentLeagueEntry(leagueData.entry);
+                // Extract only LeagueEntry fields to avoid including extra fields
+                const entry: LeagueEntry = {
+                  leagueId: leagueData.entry.leagueId || '',
+                  queueType: leagueData.entry.queueType || '',
+                  tier: leagueData.entry.tier || '',
+                  rank: leagueData.entry.rank || '',
+                  leaguePoints: leagueData.entry.leaguePoints || 0,
+                  wins: leagueData.entry.wins || 0,
+                  losses: leagueData.entry.losses || 0,
+                  veteran: leagueData.entry.veteran || false,
+                  inactive: leagueData.entry.inactive || false,
+                  freshBlood: leagueData.entry.freshBlood || false,
+                  hotStreak: leagueData.entry.hotStreak || false,
+                };
+                setCurrentLeagueEntry(entry);
               }
             }
           } catch (error) {

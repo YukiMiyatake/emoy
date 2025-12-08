@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RiotApiClient } from '@/lib/riot/client';
+import { LeagueEntry } from '@/types';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -44,7 +45,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ entry });
+    // Extract only LeagueEntry fields to avoid including extra fields like puuid
+    const leagueEntry: LeagueEntry = {
+      leagueId: entry.leagueId || '',
+      queueType: entry.queueType || '',
+      tier: entry.tier || '',
+      rank: entry.rank || '',
+      leaguePoints: entry.leaguePoints || 0,
+      wins: entry.wins || 0,
+      losses: entry.losses || 0,
+      veteran: entry.veteran || false,
+      inactive: entry.inactive || false,
+      freshBlood: entry.freshBlood || false,
+      hotStreak: entry.hotStreak || false,
+    };
+
+    return NextResponse.json({ entry: leagueEntry });
   } catch (error) {
     console.error('Riot API Error:', error);
     return NextResponse.json(
