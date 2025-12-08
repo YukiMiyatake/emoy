@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  Brush,
 } from 'recharts';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { tierRankToLP, lpToTierRank } from '@/lib/riot/client';
@@ -19,6 +20,7 @@ import { Goal, RateHistory } from '@/types';
 
 interface ChartDataPoint {
   date: string;
+  dateValue: number; // Numeric date value for X-axis domain control
   lp: number;
   movingAverage?: number;
   predictedLP?: number;
@@ -32,50 +34,32 @@ export default function RateChart() {
   const { rateHistory, goals, clearRateHistory } = useAppStore();
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
   const [isResetting, setIsResetting] = useState(false);
+  const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
+  const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
+  
+  // Reset brush when timeRange changes
+  const handleTimeRangeChange = (newRange: TimeRange) => {
+    setTimeRange(newRange);
+    setBrushStartIndex(undefined);
+    setBrushEndIndex(undefined);
+  };
 
-  // Filter rate history by time range
-  const filteredRateHistory = useMemo(() => {
-    if (rateHistory.length === 0) {
-      return [];
-    }
-
-    if (timeRange === 'all') {
-      return rateHistory;
-    }
-
-    const now = new Date();
-    let startDate: Date;
-
-    switch (timeRange) {
-      case '5years':
-        startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
-        break;
-      case '1year':
-        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        break;
-      case '1month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        break;
-      case '1week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        return rateHistory;
-    }
-
-    return rateHistory.filter((entry) => {
-      const entryDate = new Date(entry.date);
-      return entryDate >= startDate;
-    });
-  }, [rateHistory, timeRange]);
-
+  // Chart data should use ALL data, not filtered data
+  // The time range filter only affects the initial brush position
   const chartData = useMemo(() => {
-    if (filteredRateHistory.length === 0) {
-      return { data: [], yAxisDomain: [0, 2800], yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800] };
+    if (rateHistory.length === 0) {
+      return { 
+        data: [], 
+        yAxisDomain: [0, 2800], 
+        yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800],
+        xAxisDomain: [0, Date.now()],
+        brushStartIndex: undefined,
+        brushEndIndex: undefined,
+      };
     }
 
-    // Sort by date (oldest first)
-    const sorted = [...filteredRateHistory].sort(
+    // Sort by date (oldest first) - use ALL data
+    const sorted = [...rateHistory].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -87,9 +71,14 @@ export default function RateChart() {
     const dataPoints: (ChartDataPoint & { dateTime: number; originalEntry: RateHistory })[] = sorted.map((entry) => {
       const dateTime = new Date(entry.date).getTime();
       const totalLP = tierRankToLP(entry.tier, entry.rank, entry.lp);
-      console.log(`[RateChart] Entry: ${new Date(entry.date).toLocaleDateString('ja-JP')} - ${entry.tier} ${entry.rank} ${entry.lp}LP = Total LP: ${totalLP}`);
+      const date = new Date(entry.date);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const dateStr = `${month}/${day}`;
+      console.log(`[RateChart] Entry: ${dateStr} - ${entry.tier} ${entry.rank} ${entry.lp}LP = Total LP: ${totalLP}`);
       return {
-        date: new Date(entry.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
+        date: dateStr,
+        dateValue: dateTime,
         dateTime,
         lp: totalLP,
         originalEntry: entry,
@@ -108,8 +97,13 @@ export default function RateChart() {
     const predictions = generatePredictionPoints(sorted, 30);
     const predictionPoints: (ChartDataPoint & { dateTime: number })[] = predictions.map((pred) => {
       const dateTime = new Date(pred.date).getTime();
+      const date = new Date(pred.date);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const dateStr = `${month}/${day}`;
       return {
-        date: new Date(pred.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }),
+        date: dateStr,
+        dateValue: dateTime,
         dateTime,
         lp: NaN,
         predictedLP: pred.predictedLP,
@@ -131,8 +125,49 @@ export default function RateChart() {
     // Combine and sort by dateTime
     const combined = [...dataPoints, ...predictionPoints].sort((a, b) => a.dateTime - b.dateTime);
     
-    // Remove dateTime before returning (not needed for chart)
+    // Remove dateTime before returning (not needed for chart, but keep dateValue)
     const finalData = combined.map(({ dateTime, originalEntry, ...rest }) => rest);
+    
+    // Calculate X-axis domain based on time range
+    const now = Date.now();
+    let xAxisDomain: [number, number];
+    
+    if (timeRange === 'all') {
+      // Show all data
+      const minDate = finalData.length > 0 ? Math.min(...finalData.map(d => d.dateValue)) : now;
+      const maxDate = finalData.length > 0 ? Math.max(...finalData.map(d => d.dateValue)) : now;
+      xAxisDomain = [minDate, maxDate];
+    } else {
+      // Calculate start date based on time range
+      let startDate: number;
+      switch (timeRange) {
+        case '5years':
+          startDate = new Date(now).setFullYear(new Date(now).getFullYear() - 5);
+          break;
+        case '1year':
+          startDate = new Date(now).setFullYear(new Date(now).getFullYear() - 1);
+          break;
+        case '1month':
+          startDate = new Date(now).setMonth(new Date(now).getMonth() - 1);
+          break;
+        case '1week':
+          startDate = now - 7 * 24 * 60 * 60 * 1000;
+          break;
+        default:
+          startDate = now;
+      }
+      
+      // Find the actual data range within the filtered data
+      const dataMinDate = finalData.length > 0 ? Math.min(...finalData.map(d => d.dateValue)) : now;
+      const dataMaxDate = finalData.length > 0 ? Math.max(...finalData.map(d => d.dateValue)) : now;
+      
+      // Set domain to show from startDate to now (or data max, whichever is later)
+      // But ensure we show at least the filtered data range
+      const domainStart = Math.min(startDate, dataMinDate);
+      const domainEnd = Math.max(now, dataMaxDate);
+      
+      xAxisDomain = [domainStart, domainEnd];
+    }
     
     // Calculate Y-axis domain (min and max LP values)
     const lpValues = finalData
@@ -140,19 +175,24 @@ export default function RateChart() {
       .filter(lp => !isNaN(lp));
     
     if (lpValues.length === 0) {
-      return { data: finalData, yAxisDomain: [0, 2800], yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800] };
+      return { 
+        data: finalData, 
+        yAxisDomain: [0, 2800], 
+        yAxisTicks: [0, 400, 800, 1200, 1600, 2000, 2400, 2800],
+        xAxisDomain,
+      };
     }
     
     const minLP = Math.min(...lpValues);
     const maxLP = Math.max(...lpValues);
     const range = maxLP - minLP;
     
-    // Calculate appropriate padding (10% of range, minimum 50)
-    const padding = Math.max(50, range * 0.1);
+    // Calculate appropriate padding (5% of range, minimum 20) - reduced padding for tighter fit
+    const padding = Math.max(20, range * 0.05);
     
-    // Round down min and round up max to nearest 50 for cleaner display
-    const roundedMin = Math.floor((minLP - padding) / 50) * 50;
-    const roundedMax = Math.ceil((maxLP + padding) / 50) * 50;
+    // Round down min and round up max to nearest 25 for cleaner display
+    const roundedMin = Math.floor((minLP - padding) / 25) * 25;
+    const roundedMax = Math.ceil((maxLP + padding) / 25) * 25;
     
     const yAxisDomain = [Math.max(0, roundedMin), roundedMax];
     
@@ -192,13 +232,69 @@ export default function RateChart() {
     
     const yAxisTicks = generateYTicks();
     
+    // Calculate brush start/end indices based on time range
+    // When time range is not 'all', show the most recent data (right side)
+    // Brush can scroll through ALL data, but initial position is set by time range
+    let brushStart: number | undefined = undefined;
+    let brushEnd: number | undefined = undefined;
+    
+    if (timeRange !== 'all' && finalData.length > 0) {
+      const now = Date.now();
+      let targetStartDate: number;
+      
+      switch (timeRange) {
+        case '5years':
+          targetStartDate = new Date(now).setFullYear(new Date(now).getFullYear() - 5);
+          break;
+        case '1year':
+          targetStartDate = new Date(now).setFullYear(new Date(now).getFullYear() - 1);
+          break;
+        case '1month':
+          targetStartDate = new Date(now).setMonth(new Date(now).getMonth() - 1);
+          break;
+        case '1week':
+          targetStartDate = now - 7 * 24 * 60 * 60 * 1000;
+          break;
+        default:
+          targetStartDate = now;
+      }
+      
+      // Find the index of the first data point >= targetStartDate
+      let startIdx = finalData.findIndex(d => d.dateValue >= targetStartDate);
+      if (startIdx === -1) {
+        // If no data point is >= targetStartDate, show all data from the beginning
+        startIdx = 0;
+      }
+      
+      // Always end at the last data point (most recent)
+      brushStart = startIdx;
+      brushEnd = finalData.length - 1;
+      
+      // Ensure we have at least some data visible
+      if (brushEnd - brushStart < 2 && finalData.length > 0) {
+        // If the range is too small, show at least the last 10% of data
+        const minVisiblePoints = Math.max(2, Math.floor(finalData.length * 0.1));
+        brushStart = Math.max(0, finalData.length - minVisiblePoints);
+        brushEnd = finalData.length - 1;
+      }
+    }
+    
     console.log('[RateChart] Final chart data points:', finalData.length);
     console.log('[RateChart] Y-axis domain:', yAxisDomain);
     console.log('[RateChart] Y-axis ticks:', yAxisTicks);
+    console.log('[RateChart] X-axis domain:', xAxisDomain);
+    console.log('[RateChart] Brush start:', brushStart, 'end:', brushEnd);
     console.log('[RateChart] Sample data:', finalData.slice(0, 3));
     
-    return { data: finalData, yAxisDomain, yAxisTicks };
-  }, [filteredRateHistory, goals]);
+    return { 
+      data: finalData, 
+      yAxisDomain, 
+      yAxisTicks, 
+      xAxisDomain,
+      brushStartIndex: brushStart,
+      brushEndIndex: brushEnd,
+    };
+  }, [rateHistory, goals, timeRange]);
 
   if (rateHistory.length === 0) {
     return (
@@ -216,7 +312,7 @@ export default function RateChart() {
         <div className="flex gap-2">
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+            onChange={(e) => handleTimeRangeChange(e.target.value as TimeRange)}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">無限</option>
@@ -247,15 +343,17 @@ export default function RateChart() {
           </button>
         </div>
       </div>
-      {filteredRateHistory.length === 0 && rateHistory.length > 0 && (
-        <p className="text-sm text-gray-500 mb-4">
-          選択した期間にデータがありません。期間を変更してください。
-        </p>
-      )}
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={chartData.data} margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={600}>
+        <LineChart data={chartData.data} margin={{ top: 5, right: 30, left: 80, bottom: 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
+          <XAxis 
+            dataKey="date"
+            type="category"
+            allowDuplicatedCategory={false}
+            angle={-45}
+            textAnchor="end"
+            height={80}
+          />
           <YAxis 
             domain={chartData.yAxisDomain}
             ticks={chartData.yAxisTicks}
@@ -352,6 +450,38 @@ export default function RateChart() {
             name="目標"
             dot={false}
             connectNulls={false}
+          />
+          <Brush
+            dataKey="date"
+            height={30}
+            stroke="#3b82f6"
+            fill="#3b82f6"
+            fillOpacity={0.3}
+            strokeWidth={2}
+            travellerWidth={12}
+            startIndex={brushStartIndex ?? chartData.brushStartIndex}
+            endIndex={brushEndIndex ?? chartData.brushEndIndex}
+            onChange={(brushData: any) => {
+              if (brushData && typeof brushData.startIndex === 'number' && typeof brushData.endIndex === 'number') {
+                setBrushStartIndex(brushData.startIndex);
+                setBrushEndIndex(brushData.endIndex);
+              }
+            }}
+            traveller={(props: any) => {
+              const { x, y, width, height } = props;
+              return (
+                <rect
+                  x={x}
+                  y={y}
+                  width={width}
+                  height={height}
+                  fill="#1e40af"
+                  stroke="#1e3a8a"
+                  strokeWidth={2}
+                  rx={2}
+                />
+              );
+            }}
           />
         </LineChart>
       </ResponsiveContainer>
