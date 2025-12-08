@@ -50,6 +50,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addRateHistory: async (rate) => {
     try {
       set({ isLoading: true, error: null });
+      // add() method now handles duplicate checking internally
       await rateHistoryService.add(rate);
       await get().loadRateHistory();
     } catch (error) {

@@ -374,8 +374,13 @@ export default function SummonerSearch() {
       // Save rate history to database
       if (result.rateHistory && result.rateHistory.length > 0) {
         const { addRateHistory } = useAppStore.getState();
+        let addedCount = 0;
+        let updatedCount = 0;
+        const existingCount = useAppStore.getState().rateHistory.length;
+        
         for (const entry of result.rateHistory) {
           try {
+            const beforeCount = useAppStore.getState().rateHistory.length;
             await addRateHistory({
               date: new Date(entry.date),
               tier: entry.tier,
@@ -384,10 +389,18 @@ export default function SummonerSearch() {
               wins: entry.wins,
               losses: entry.losses,
             });
+            const afterCount = useAppStore.getState().rateHistory.length;
+            if (afterCount > beforeCount) {
+              addedCount++;
+            } else {
+              updatedCount++;
+            }
           } catch (error) {
             console.error('[SummonerSearch] Error saving rate history entry:', error);
           }
         }
+        
+        console.log(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated`);
       }
 
       // Update current league entry
@@ -510,21 +523,16 @@ export default function SummonerSearch() {
           return entryDate >= today && entryDate < tomorrow;
         });
 
-        if (existing) {
-          // Update existing entry (we need to implement update method in store)
-          // For now, just reload
-          await useAppStore.getState().loadRateHistory();
-        } else {
-          // Add new entry
-          await useAppStore.getState().addRateHistory({
-            date: new Date(result.entry.date),
-            tier: result.entry.tier,
-            rank: result.entry.rank,
-            lp: result.entry.lp,
-            wins: result.entry.wins,
-            losses: result.entry.losses,
-          });
-        }
+        // addRateHistory() now handles duplicate checking internally
+        // It will update existing entry if same date exists, or add new one
+        await useAppStore.getState().addRateHistory({
+          date: new Date(result.entry.date),
+          tier: result.entry.tier,
+          rank: result.entry.rank,
+          lp: result.entry.lp,
+          wins: result.entry.wins,
+          losses: result.entry.losses,
+        });
       }
       
       const successMsg = 'レートを更新しました';

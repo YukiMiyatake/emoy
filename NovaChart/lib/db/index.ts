@@ -39,6 +39,30 @@ export const rateHistoryService = {
   },
 
   async add(rate: Omit<RateHistory, 'id'>): Promise<number> {
+    // Check for duplicate by date (same day)
+    const rateDate = new Date(rate.date);
+    const startOfDay = new Date(rateDate.getFullYear(), rateDate.getMonth(), rateDate.getDate());
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    const existing = await db.rateHistory
+      .where('date')
+      .between(startOfDay, endOfDay, true, false)
+      .first();
+
+    if (existing) {
+      // Update existing entry instead of adding duplicate
+      console.log('[RateHistoryService] Duplicate entry found for date:', rateDate.toISOString(), 'Updating existing entry');
+      await db.rateHistory.update(existing.id!, {
+        tier: rate.tier,
+        rank: rate.rank,
+        lp: rate.lp,
+        wins: rate.wins,
+        losses: rate.losses,
+      });
+      return existing.id!;
+    }
+
     return await db.rateHistory.add(rate as RateHistory);
   },
 
