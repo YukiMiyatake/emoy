@@ -10,6 +10,8 @@ export default function MatchDetailsPanel() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [matchRatings, setMatchRatings] = useState<Map<number, MatchRatingResult>>(new Map());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadMatches();
@@ -26,8 +28,23 @@ export default function MatchDetailsPanel() {
     setMatchRatings(ratings);
   }, [matches]);
 
-  // 最近の試合を取得（最新20試合）
-  const recentMatches = matches.slice(0, 20);
+  // ページネーション計算
+  const totalPages = Math.ceil(matches.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedMatches = matches.slice(startIndex, endIndex);
+
+  // ページ変更時に先頭にスクロール
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+
+  // 表示件数変更時にページをリセット
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
 
   const formatDate = (date: Date) => {
     const d = new Date(date);
@@ -60,30 +77,82 @@ export default function MatchDetailsPanel() {
     }
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // ページ変更時に選択をクリア
+    setSelectedMatch(null);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">試合詳細</h2>
-        {matches.length > 0 && (
-          <button
-            onClick={handleDeleteAllMatches}
-            disabled={isDeleting}
-            className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isDeleting ? '削除中...' : '試合データ削除'}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {matches.length > 0 && (
+            <>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">表示件数:</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={10}>10件</option>
+                  <option value={20}>20件</option>
+                  <option value={50}>50件</option>
+                  <option value={100}>100件</option>
+                </select>
+              </div>
+              <button
+                onClick={handleDeleteAllMatches}
+                disabled={isDeleting}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? '削除中...' : '試合データ削除'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {recentMatches.length === 0 ? (
+      {matches.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">試合データがありません</p>
           <p className="text-sm text-gray-400">サマナーを検索またはUpdateボタンでデータを取得してください</p>
         </div>
       ) : (
         <>
-          <div className="space-y-3 mb-6">
-        {recentMatches.map((match) => {
+          {/* ページネーション情報 */}
+          <div className="flex items-center justify-between mb-4 text-sm text-gray-600 dark:text-gray-400">
+            <div>
+              全{matches.length}試合中 {startIndex + 1}-{Math.min(endIndex, matches.length)}試合を表示
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  前へ
+                </button>
+                <span>
+                  ページ {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  次へ
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* スクロール可能な試合一覧 */}
+          <div className="space-y-3 mb-6 max-h-[600px] overflow-y-auto pr-2">
+            {paginatedMatches.map((match) => {
           const rating = match.id !== undefined ? matchRatings.get(match.id) : null;
           const kda = match.kda;
           const kdaText = kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : '-';
@@ -150,10 +219,55 @@ export default function MatchDetailsPanel() {
               </div>
             </div>
           );
-        })}
-      </div>
+            })}
+          </div>
 
-      {selectedMatch && (
+          {/* ページネーション（下部） */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                最初
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`px-3 py-1 text-sm border rounded-md ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                最後
+              </button>
+            </div>
+          )}
+
+          {selectedMatch && (
         <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
           <h3 className="text-lg font-semibold mb-4">試合詳細情報</h3>
           
