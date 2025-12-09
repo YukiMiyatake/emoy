@@ -1,5 +1,6 @@
 import { Summoner, LeagueEntry } from '@/types';
 import { logger } from '@/lib/utils/logger';
+import { handleRiotApiError } from '@/lib/utils/errorHandler';
 
 // Riot Games API base URLs
 // Platform routing (for summoner-v4, league-v4, etc.)
@@ -89,18 +90,13 @@ export class RiotApiClient {
       const apiPath = urlObj.pathname;
       const endpointInfo = endpointName || apiPath;
 
-      // Provide more specific error messages
-      if (response.status === 403) {
-        throw new Error(`403 Forbidden: APIキーが無効または権限がありません。\nエラー発生API: ${endpointInfo}\nアプリ内の「APIキー設定」で正しいAPIキーを設定してください。開発用APIキーは24時間で期限切れになります。\n詳細: ${errorMessage}`);
-      } else if (response.status === 401) {
-        throw new Error(`401 Unauthorized: APIキーが設定されていません。環境変数RIOT_API_KEYを確認してください。`);
-      } else if (response.status === 404) {
-        throw new Error(`404 Not Found: サマナーが見つかりませんでした。サマナー名を確認してください。`);
-      } else if (response.status === 429) {
-        throw new Error(`429 Too Many Requests: APIレート制限に達しました。しばらく待ってから再試行してください。`);
-      }
-
-      throw new Error(`Riot API Error: ${response.status} - ${errorMessage}`);
+      // Create error object with status code
+      const error = new Error(`Riot API Error: ${response.status} - ${errorMessage}`);
+      (error as any).statusCode = response.status;
+      
+      // Use error handler to get user-friendly message
+      const userFriendlyMessage = handleRiotApiError(error, endpointInfo);
+      throw new Error(userFriendlyMessage);
     }
 
     return response.json();

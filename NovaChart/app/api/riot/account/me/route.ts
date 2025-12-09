@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RiotApiClient } from '@/lib/riot/client';
 import { logger } from '@/lib/utils/logger';
+import { handleRiotApiError, getErrorStatusCode } from '@/lib/utils/errorHandler';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -28,19 +29,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[API Route] Riot API Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch account data';
-    
-    // Return appropriate status code based on error message
-    let statusCode = 500;
-    if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-      statusCode = 403;
-    } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-      statusCode = 401;
-    } else if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
-      statusCode = 404;
-    } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
-      statusCode = 429;
-    }
+    const errorMessage = handleRiotApiError(error, '/api/riot/account/me');
+    const statusCode = getErrorStatusCode(error);
     
     return NextResponse.json(
       { error: errorMessage },

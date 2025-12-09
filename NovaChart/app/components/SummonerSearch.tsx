@@ -8,6 +8,7 @@ import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
 import { StorageService } from '@/lib/utils/storage';
 import { getDateKey } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
+import { handleRiotApiError } from '@/lib/utils/errorHandler';
 
 interface SummonerSearchProps {
   isExpanded?: boolean;
@@ -218,25 +219,15 @@ export default function SummonerSearch({
           return;
         } else {
           // Handle error response
-          const error = await response.json();
-          const errorMessage = error.error || 'サマナーが見つかりませんでした';
+          const errorData = await response.json();
+          const errorMessage = errorData.error || 'サマナーが見つかりませんでした';
           
-          // Provide more helpful error messages
-          if (response.status === 403) {
-            throw new Error('APIキーが無効または権限がありません。右上の「APIキー設定」で正しいAPIキーを設定してください。開発用APIキーは24時間で期限切れになります。');
-          } else if (response.status === 401 || response.status === 500) {
-            // Check if it's an API key configuration error
-            if (error.error && error.error.includes('not configured')) {
-              throw new Error('APIキーが設定されていません。右上の「APIキー設定」からAPIキーを入力してください。');
-            }
-            throw new Error(errorMessage);
-          } else if (response.status === 404) {
-            throw new Error('サマナーが見つかりませんでした。入力内容とリージョンを確認してください。');
-          } else if (response.status === 429) {
-            throw new Error('APIレート制限に達しました。しばらく待ってから再試行してください。');
-          }
+          // Create error object with status code for error handler
+          const error = new Error(errorMessage);
+          (error as any).statusCode = response.status;
           
-          throw new Error(errorMessage);
+          // Use error handler to get user-friendly message
+          throw new Error(handleRiotApiError(error, API_ENDPOINTS.RIOT.ACCOUNT_BY_RIOT_ID));
         }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '検索に失敗しました';
