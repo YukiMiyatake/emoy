@@ -7,6 +7,7 @@ import RateChart from './components/RateChart';
 import GoalSetting from './components/GoalSetting';
 import StatsPanel from './components/StatsPanel';
 import MatchDetailsPanel from './components/MatchDetailsPanel';
+import LaneStatsPanel from './components/LaneStatsPanel';
 import ApiKeySettings from './components/ApiKeySettings';
 import { Summoner, LeagueEntry, Match } from '@/types';
 import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
@@ -477,6 +478,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <RateChart />
             <MatchDetailsPanel />
+            <LaneStatsPanel />
           </div>
           <div className="space-y-6">
             <GoalSetting />
