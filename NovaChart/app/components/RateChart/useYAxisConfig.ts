@@ -15,9 +15,21 @@ export function useYAxisConfig(
   chartData: ChartDataResult,
   brushStartIndex: number | undefined,
   brushEndIndex: number | undefined,
-  yAxisZoom: YAxisZoom | null
+  yAxisZoom: YAxisZoom | null,
+  ignoreYAxisZoom?: boolean // When true, ignore yAxisZoom and use baseYAxisDomain
 ): YAxisConfig {
   const config = useMemo(() => {
+    // Debug: Log when useMemo is called
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useYAxisConfig] useMemo called with:', {
+        brushStartIndex,
+        brushEndIndex,
+        chartDataBrushStart: chartData.brushStartIndex,
+        chartDataBrushEnd: chartData.brushEndIndex,
+        dataLength: chartData.data?.length || 0,
+      });
+    }
+    
     if (!chartData.data || chartData.data.length === 0) {
       return {
         yAxisDomain: [0, 2800] as [number, number],
@@ -26,13 +38,10 @@ export function useYAxisConfig(
     }
 
     // Determine displayed data range based on Brush selection
-    // Priority: brushStartIndex/brushEndIndex (explicit selection) > chartData.brushStartIndex/brushEndIndex (initial range) > full range
-    const effectiveStartIndex = brushStartIndex !== undefined 
-      ? brushStartIndex 
-      : (chartData.brushStartIndex !== undefined ? chartData.brushStartIndex : 0);
-    const effectiveEndIndex = brushEndIndex !== undefined 
-      ? brushEndIndex 
-      : (chartData.brushEndIndex !== undefined ? chartData.brushEndIndex : chartData.data.length - 1);
+    // Use the same logic as ChartContainer: brushStartIndex ?? chartData.brushStartIndex
+    // This ensures we use the actual displayed range, regardless of timeRange
+    const effectiveStartIndex = brushStartIndex ?? chartData.brushStartIndex ?? 0;
+    const effectiveEndIndex = brushEndIndex ?? chartData.brushEndIndex ?? chartData.data.length - 1;
     
     // Ensure valid range
     const displayedStart = Math.max(0, Math.min(effectiveStartIndex, chartData.data.length - 1));
@@ -41,15 +50,19 @@ export function useYAxisConfig(
     
     // Debug log
     if (process.env.NODE_ENV === 'development') {
-      console.log('[useYAxisConfig] Brush range:', {
+      console.log('[useYAxisConfig] Recalculating Y-axis:', {
         brushStartIndex,
         brushEndIndex,
         chartDataBrushStart: chartData.brushStartIndex,
         chartDataBrushEnd: chartData.brushEndIndex,
-        effectiveStart: displayedStart,
-        effectiveEnd: displayedEnd,
+        effectiveStartIndex,
+        effectiveEndIndex,
+        displayedStart,
+        displayedEnd,
         displayedDataLength: displayedData.length,
         totalDataLength: chartData.data.length,
+        firstDataPoint: displayedData[0] ? { lp: displayedData[0].lp, date: displayedData[0].date } : null,
+        lastDataPoint: displayedData[displayedData.length - 1] ? { lp: displayedData[displayedData.length - 1].lp, date: displayedData[displayedData.length - 1].date } : null,
       });
     }
 
@@ -66,6 +79,16 @@ export function useYAxisConfig(
         lpValues.push(d.predictedLP);
       }
     });
+    
+    // Debug: Log LP values range
+    if (process.env.NODE_ENV === 'development' && lpValues.length > 0) {
+      console.log('[useYAxisConfig] LP values range:', {
+        lpValuesCount: lpValues.length,
+        lpValuesMin: Math.min(...lpValues),
+        lpValuesMax: Math.max(...lpValues),
+        displayedDataLength: displayedData.length,
+      });
+    }
 
     // Get goal LP values from displayed data (goalLineLP_${index} values)
     const goalLPValues: number[] = [];
@@ -80,9 +103,27 @@ export function useYAxisConfig(
         });
       });
     }
+    
+    // Debug: Log goal LP values range
+    if (process.env.NODE_ENV === 'development' && goalLPValues.length > 0) {
+      console.log('[useYAxisConfig] Goal LP values range:', {
+        goalLPValuesCount: goalLPValues.length,
+        goalLPValuesMin: Math.min(...goalLPValues),
+        goalLPValuesMax: Math.max(...goalLPValues),
+      });
+    }
 
     // Combine all LP values
     const allLPValues = [...lpValues, ...goalLPValues];
+    
+    // Debug: Log all LP values range
+    if (process.env.NODE_ENV === 'development' && allLPValues.length > 0) {
+      console.log('[useYAxisConfig] All LP values range:', {
+        allLPValuesCount: allLPValues.length,
+        allLPValuesMin: Math.min(...allLPValues),
+        allLPValuesMax: Math.max(...allLPValues),
+      });
+    }
 
     if (allLPValues.length === 0) {
       return {
@@ -100,7 +141,27 @@ export function useYAxisConfig(
     const roundedMax = Math.ceil((maxLP + padding) / 25) * 25;
 
     const baseYAxisDomain: [number, number] = [Math.max(0, roundedMin), roundedMax];
-    const yAxisDomain = yAxisZoom 
+    
+    // Debug: Log domain calculation
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useYAxisConfig] Domain calculation:', {
+        minLP,
+        maxLP,
+        range,
+        padding,
+        roundedMin,
+        roundedMax,
+        baseYAxisDomainMin: baseYAxisDomain[0],
+        baseYAxisDomainMax: baseYAxisDomain[1],
+        yAxisZoom,
+        ignoreYAxisZoom,
+        willUseYAxisZoom: !!yAxisZoom && !ignoreYAxisZoom,
+      });
+    }
+    
+    // If ignoreYAxisZoom is true or brush indices have changed, use baseYAxisDomain
+    // This ensures Y-axis updates when brush changes, even if yAxisZoom is set
+    const yAxisDomain = (yAxisZoom && !ignoreYAxisZoom)
       ? [Math.max(0, yAxisZoom.min), yAxisZoom.max] as [number, number]
       : baseYAxisDomain;
 
@@ -138,11 +199,39 @@ export function useYAxisConfig(
 
     const yAxisTicks = generateYTicks();
 
-    return {
+    const result = {
       yAxisDomain,
       yAxisTicks,
     };
-  }, [chartData, brushStartIndex, brushEndIndex, yAxisZoom]);
+    
+    // Debug log
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useYAxisConfig] Y-axis result:', {
+        yAxisDomain: result.yAxisDomain,
+        yAxisDomainMin: result.yAxisDomain[0],
+        yAxisDomainMax: result.yAxisDomain[1],
+        yAxisTicks: result.yAxisTicks,
+        minLP,
+        maxLP,
+        displayedDataLength: displayedData.length,
+        allLPValuesLength: allLPValues.length,
+        hasYAxisZoom: !!yAxisZoom,
+      });
+    }
+    
+    return result;
+  }, [
+    chartData.data, // Keep full array reference - useMemo will detect reference changes
+    chartData.data?.length, // Also track length changes
+    chartData.brushStartIndex,
+    chartData.brushEndIndex,
+    chartData.goalData, // Keep full array reference
+    chartData.goalData?.length, // Also track length changes
+    brushStartIndex, // This should trigger recalculation when brush changes
+    brushEndIndex, // This should trigger recalculation when brush changes
+    yAxisZoom,
+    ignoreYAxisZoom, // Track ignoreYAxisZoom flag
+  ]);
 
   return config;
 }

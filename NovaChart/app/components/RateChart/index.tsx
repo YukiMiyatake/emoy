@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { useChartData } from './useChartData';
 import { useYAxisConfig, YAxisZoom } from './useYAxisConfig';
@@ -53,24 +53,52 @@ export default function RateChart() {
   console.log('RateChart after hooks:', {
     chartDataLength: chartData.data?.length || 0,
     yAxisDomain: yAxisConfig.yAxisDomain,
+    yAxisDomainMin: yAxisConfig.yAxisDomain[0],
+    yAxisDomainMax: yAxisConfig.yAxisDomain[1],
+    yAxisTicks: yAxisConfig.yAxisTicks,
+    brushStartIndex,
+    brushEndIndex,
   });
 
-  // Initialize brush indices from chartData when they are undefined
+  // Track if brush has been initialized or manually set by user
+  const brushInitializedRef = useRef<string | null>(null); // Store timeRange key to track initialization per timeRange
+  const brushStartIndexRef = useRef<number | undefined>(brushStartIndex);
+  const brushEndIndexRef = useRef<number | undefined>(brushEndIndex);
+  
+  // Keep refs in sync with state
   useEffect(() => {
-    if (brushStartIndex === undefined && chartData.brushStartIndex !== undefined) {
-      setBrushStartIndex(chartData.brushStartIndex);
+    brushStartIndexRef.current = brushStartIndex;
+    brushEndIndexRef.current = brushEndIndex;
+  }, [brushStartIndex, brushEndIndex]);
+  
+  // Initialize brush indices from chartData only when:
+  // 1. Not yet initialized for current timeRange
+  // 2. brushStartIndex/brushEndIndex are undefined (not set by user)
+  // 3. chartData has valid brush indices
+  useEffect(() => {
+    // Include brushStartIndex and brushEndIndex in key to detect data reloads
+    // This ensures reinitialization when data is cleared and reloaded with same length
+    const timeRangeKey = `${timeRange}-${chartData.data?.length || 0}-${chartData.brushStartIndex ?? 'null'}-${chartData.brushEndIndex ?? 'null'}`;
+    
+    // Only initialize if not yet initialized for this timeRange and brush indices are not set by user
+    if (brushInitializedRef.current !== timeRangeKey && brushStartIndexRef.current === undefined && brushEndIndexRef.current === undefined) {
+      if (chartData.brushStartIndex !== undefined && chartData.brushEndIndex !== undefined) {
+        setBrushStartIndex(chartData.brushStartIndex);
+        setBrushEndIndex(chartData.brushEndIndex);
+        brushInitializedRef.current = timeRangeKey;
+      }
     }
-    if (brushEndIndex === undefined && chartData.brushEndIndex !== undefined) {
-      setBrushEndIndex(chartData.brushEndIndex);
-    }
-  }, [chartData.brushStartIndex, chartData.brushEndIndex, brushStartIndex, brushEndIndex]);
+  }, [chartData.brushStartIndex, chartData.brushEndIndex, chartData.data?.length, timeRange]); // Remove brushStartIndex/brushEndIndex from deps to avoid race conditions
 
   // Reset brush when timeRange changes
   const handleTimeRangeChange = (newRange: TimeRange) => {
     setTimeRange(newRange);
     setBrushStartIndex(undefined);
     setBrushEndIndex(undefined);
+    brushStartIndexRef.current = undefined;
+    brushEndIndexRef.current = undefined;
     setYAxisZoom(null); // Reset zoom when timeRange changes
+    brushInitializedRef.current = null; // Reset initialization flag
   };
 
   // Handle legend click to toggle line visibility
@@ -167,8 +195,19 @@ export default function RateChart() {
         hiddenLines={hiddenLines}
         yAxisZoom={yAxisZoom}
         onBrushChange={(start, end) => {
+          console.log('[RateChart] onBrushChange called:', { start, end, currentBrushStart: brushStartIndex, currentBrushEnd: brushEndIndex });
           setBrushStartIndex(start);
           setBrushEndIndex(end);
+          brushStartIndexRef.current = start;
+          brushEndIndexRef.current = end;
+          // When brush changes, we want Y-axis to update to the new range
+          // If yAxisZoom is set, we reset it to allow automatic adjustment
+          // Alternatively, we could update yAxisZoom to match the new range, but resetting is simpler
+          setYAxisZoom(null);
+          // Mark as initialized when user moves brush to prevent auto-initialization from overriding
+          // Use same key format as initialization check
+          const timeRangeKey = `${timeRange}-${chartData.data?.length || 0}-${chartData.brushStartIndex ?? 'null'}-${chartData.brushEndIndex ?? 'null'}`;
+          brushInitializedRef.current = timeRangeKey;
         }}
         onLegendClick={handleLegendClick}
         onYAxisZoom={handleYAxisZoom}
