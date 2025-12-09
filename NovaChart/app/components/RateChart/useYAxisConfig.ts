@@ -18,8 +18,11 @@ const lpYAxisOptions: YAxisConfigOptions = {
   dataKeys: ['lp', 'movingAverage', 'predictedLP'],
   paddingRatio: 0.05,
   minPadding: 20,
-  roundingFunction: (value: number, interval: number) => {
+  roundingFunctionMin: (value: number, interval: number) => {
     return Math.floor(value / interval) * interval;
+  },
+  roundingFunctionMax: (value: number, interval: number) => {
+    return Math.ceil(value / interval) * interval;
   },
   tickIntervalCalculator: (range: number) => {
     if (range <= 200) return 25;

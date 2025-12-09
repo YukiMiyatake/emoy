@@ -10,8 +10,11 @@ const csYAxisOptions: YAxisConfigOptions = {
   dataKeys: ['csPerMin', 'movingAverage'],
   paddingRatio: 0.1,
   minPadding: 0.5,
-  roundingFunction: (value: number, interval: number) => {
+  roundingFunctionMin: (value: number, interval: number) => {
     return Math.floor(value / interval) * interval;
+  },
+  roundingFunctionMax: (value: number, interval: number) => {
+    return Math.ceil(value / interval) * interval;
   },
   tickIntervalCalculator: (range: number) => {
     if (range <= 1) return 0.1;

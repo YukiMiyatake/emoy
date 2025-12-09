@@ -10,8 +10,11 @@ const damageYAxisOptions: YAxisConfigOptions = {
   dataKeys: ['damagePerMin', 'movingAverage'],
   paddingRatio: 0.1,
   minPadding: 50,
-  roundingFunction: (value: number, interval: number) => {
+  roundingFunctionMin: (value: number, interval: number) => {
     return Math.floor(value / interval) * interval;
+  },
+  roundingFunctionMax: (value: number, interval: number) => {
+    return Math.ceil(value / interval) * interval;
   },
   tickIntervalCalculator: (range: number) => {
     if (range <= 200) return 25;

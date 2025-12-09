@@ -14,7 +14,8 @@ export interface YAxisConfigOptions {
   dataKeys: string[];
   paddingRatio: number;
   minPadding: number;
-  roundingFunction: (value: number, interval: number) => number;
+  roundingFunctionMin: (value: number, interval: number) => number;
+  roundingFunctionMax: (value: number, interval: number) => number;
   tickIntervalCalculator: (range: number) => number;
   useSetForTicks?: boolean; // For CS chart which uses Set
   tickRoundingFunction?: (value: number) => number; // For CS chart
@@ -80,8 +81,8 @@ export function useGenericYAxisConfig<T extends ChartDataWithBrush>(
 
     const padding = Math.max(options.minPadding, range * options.paddingRatio);
     const tickInterval = options.tickIntervalCalculator(range);
-    const roundedMin = options.roundingFunction(minValue - padding, tickInterval);
-    const roundedMax = options.roundingFunction(maxValue + padding, tickInterval);
+    const roundedMin = options.roundingFunctionMin(minValue - padding, tickInterval);
+    const roundedMax = options.roundingFunctionMax(maxValue + padding, tickInterval);
 
     const baseYAxisDomain: [number, number] = [Math.max(0, roundedMin), roundedMax];
     
@@ -175,6 +176,8 @@ export function useGenericYAxisConfig<T extends ChartDataWithBrush>(
     options.dataKeys,
     options.paddingRatio,
     options.minPadding,
+    options.roundingFunctionMin,
+    options.roundingFunctionMax,
   ]);
 }
 
