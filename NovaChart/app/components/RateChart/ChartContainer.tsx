@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   LineChart,
   Line,
@@ -44,17 +44,29 @@ export default function ChartContainer({
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle mouse wheel on chart container
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const delta = e.deltaY;
-    const zoomIn = delta < 0;
-    onYAxisZoom(zoomIn);
-  };
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const delta = e.deltaY;
+      const zoomIn = delta < 0;
+      onYAxisZoom(zoomIn);
+    };
+
+    // Add event listener with { passive: false } to allow preventDefault
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [onYAxisZoom]);
 
   return (
-    <div ref={chartContainerRef} className="w-full" onWheel={handleWheel}>
+    <div ref={chartContainerRef} className="w-full">
       <ResponsiveContainer width="100%" height={600}>
         <LineChart data={chartData.data} margin={{ top: 5, right: 30, left: 80, bottom: 100 }}>
           <CartesianGrid strokeDasharray="3 3" />
