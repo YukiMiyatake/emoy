@@ -30,6 +30,17 @@ export interface Match {
   killParticipation?: number;
   timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'night';
   memo?: string;
+  // 追加の詳細フィールド
+  lane?: string; // TOP, JUNGLE, MID, ADC, SUPPORT
+  damageDealt?: number; // 総ダメージ
+  damageTaken?: number; // 受けたダメージ
+  damageToChampions?: number; // チャンピオンへのダメージ
+  goldEarned?: number; // 獲得ゴールド
+  csPerMin?: number; // 分あたりのCS
+  matchId?: string; // Riot APIのマッチID
+  gameDuration?: number; // 試合時間（秒）
+  totalMinionsKilled?: number; // 総ミニオンキル数
+  neutralMinionsKilled?: number; // ジャングルミニオンキル数
 }
 
 export interface Summoner {

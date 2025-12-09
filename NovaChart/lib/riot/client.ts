@@ -1,4 +1,4 @@
-import { Summoner, LeagueEntry } from '@/types';
+import { Summoner, LeagueEntry, Match } from '@/types';
 import { logger } from '@/lib/utils/logger';
 import { handleRiotApiError } from '@/lib/utils/errorHandler';
 
@@ -363,5 +363,150 @@ export function lpToTierRank(totalLP: number): { tier: string; rank: string; lp:
   }
 
   return { tier: 'MASTER', rank: '', lp: totalLP - 2800 };
+}
+
+/**
+ * Riot APIのマッチ詳細レスポンスから、指定されたプレイヤーのMatch型データを抽出
+ * @param matchData Riot APIのマッチ詳細レスポンス
+ * @param puuid 対象プレイヤーのPUUID
+ * @returns Match型のデータ、プレイヤーが見つからない場合はnull
+ */
+export function parseMatchDetails(matchData: any, puuid: string): Match | null {
+  try {
+    const info = matchData.info;
+    if (!info || !info.participants) {
+      logger.error('[parseMatchDetails] Invalid match data structure');
+      return null;
+    }
+
+    // 対象プレイヤーのデータを取得
+    const participant = info.participants.find((p: any) => p.puuid === puuid);
+    if (!participant) {
+      logger.warn('[parseMatchDetails] Participant not found for puuid:', puuid);
+      return null;
+    }
+
+    // 試合時間（秒）
+    const gameDuration = info.gameDuration || 0;
+    const gameDurationMinutes = gameDuration / 60;
+
+    // CS計算
+    const totalMinionsKilled = participant.totalMinionsKilled || 0;
+    const neutralMinionsKilled = participant.neutralMinionsKilled || 0;
+    const totalCS = totalMinionsKilled + neutralMinionsKilled;
+    const csPerMin = gameDurationMinutes > 0 ? totalCS / gameDurationMinutes : 0;
+
+    // 10分時点のCS（challengesから取得、なければ概算）
+    // challenges.csDiffPerMinDeltasはCS差分なので、正確な10分時点のCSは別の方法で取得する必要がある
+    // 暫定的に、平均CSから10分時点を推定（正確な値はtimeline APIが必要）
+    const csAt10 = participant.challenges?.csAt10 
+      ? participant.challenges.csAt10
+      : gameDurationMinutes >= 10 
+        ? Math.round((totalMinionsKilled / gameDurationMinutes) * 10)
+        : totalMinionsKilled;
+
+    // レーン位置の変換（Riot APIのteamPositionをlaneに変換）
+    const teamPosition = participant.teamPosition || '';
+    let lane: string | undefined;
+    if (teamPosition === 'TOP') lane = 'TOP';
+    else if (teamPosition === 'JUNGLE') lane = 'JUNGLE';
+    else if (teamPosition === 'MIDDLE') lane = 'MID';
+    else if (teamPosition === 'BOTTOM') lane = 'ADC';
+    else if (teamPosition === 'UTILITY') lane = 'SUPPORT';
+
+    // 時間帯の判定（gameEndTimestampから）
+    const gameEndTimestamp = info.gameEndTimestamp;
+    let timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night' | undefined;
+    if (gameEndTimestamp) {
+      const endDate = new Date(gameEndTimestamp);
+      const hour = endDate.getHours();
+      if (hour >= 5 && hour < 12) timeOfDay = 'morning';
+      else if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
+      else if (hour >= 17 && hour < 22) timeOfDay = 'evening';
+      else timeOfDay = 'night';
+    }
+
+    // KDA計算
+    const kills = participant.kills || 0;
+    const deaths = participant.deaths || 0;
+    const assists = participant.assists || 0;
+    const kda = { kills, deaths, assists };
+
+    // キル参加率の計算
+    const teamKills = info.participants
+      .filter((p: any) => p.teamId === participant.teamId)
+      .reduce((sum: number, p: any) => sum + (p.kills || 0), 0);
+    const killParticipation = teamKills > 0 
+      ? ((kills + assists) / teamKills) * 100 
+      : undefined;
+
+    const match: Match = {
+      date: new Date(gameEndTimestamp || info.gameStartTimestamp || Date.now()),
+      win: participant.win || false,
+      role: lane, // roleとlaneは同じ値を使用
+      champion: participant.championName,
+      kda,
+      csAt10: csAt10 ? Math.round(csAt10) : undefined,
+      visionScore: participant.visionScore,
+      killParticipation: killParticipation ? Math.round(killParticipation * 10) / 10 : undefined,
+      timeOfDay,
+      lane,
+      damageDealt: participant.totalDamageDealtToChampions || 0,
+      damageTaken: participant.totalDamageTaken || 0,
+      damageToChampions: participant.totalDamageDealtToChampions || 0,
+      goldEarned: participant.goldEarned || 0,
+      csPerMin: Math.round(csPerMin * 10) / 10,
+      matchId: matchData.metadata?.matchId,
+      gameDuration,
+      totalMinionsKilled,
+      neutralMinionsKilled,
+    };
+
+    return match;
+  } catch (error) {
+    logger.error('[parseMatchDetails] Error parsing match details:', error);
+    return null;
+  }
+}
+
+/**
+ * 複数のマッチIDからマッチ詳細を取得し、指定されたプレイヤーのMatch型データに変換
+ * @param client RiotApiClientインスタンス
+ * @param matchIds マッチIDの配列
+ * @param puuid 対象プレイヤーのPUUID
+ * @param delayMs 各リクエスト間の遅延（ミリ秒、レート制限対策）
+ * @returns Match型のデータの配列
+ */
+export async function fetchAndParseMatchDetails(
+  client: RiotApiClient,
+  matchIds: string[],
+  puuid: string,
+  delayMs: number = 50
+): Promise<Match[]> {
+  const matches: Match[] = [];
+
+  for (let i = 0; i < matchIds.length; i++) {
+    try {
+      const matchId = matchIds[i];
+      logger.debug(`[fetchAndParseMatchDetails] Fetching match ${i + 1}/${matchIds.length}: ${matchId}`);
+      
+      const matchData = await client.getMatchByMatchId(matchId);
+      const match = parseMatchDetails(matchData, puuid);
+      
+      if (match) {
+        matches.push(match);
+      }
+
+      // レート制限対策: 最後のリクエスト以外は遅延を入れる
+      if (i < matchIds.length - 1 && delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    } catch (error) {
+      logger.error(`[fetchAndParseMatchDetails] Error fetching match ${matchIds[i]}:`, error);
+      // エラーが発生しても続行
+    }
+  }
+
+  return matches;
 }
 
