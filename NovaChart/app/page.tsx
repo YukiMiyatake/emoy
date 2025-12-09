@@ -8,6 +8,9 @@ import GoalSetting from './components/GoalSetting';
 import StatsPanel from './components/StatsPanel';
 import ApiKeySettings from './components/ApiKeySettings';
 import { Summoner, LeagueEntry } from '@/types';
+import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
+import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
+import { StorageService } from '@/lib/utils/storage';
 
 export default function Home() {
   const { loadRateHistory, loadGoals, loadMatches, currentSummoner, currentLeagueEntry, setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, addRateHistory } = useAppStore();
@@ -44,11 +47,9 @@ export default function Home() {
 
   useEffect(() => {
     // Load Riot ID from localStorage
-    if (typeof window !== 'undefined') {
-      const savedRiotId = localStorage.getItem('riot_id');
-      if (savedRiotId) {
-        setRiotId(savedRiotId);
-      }
+    const savedRiotId = StorageService.getRiotId();
+    if (savedRiotId) {
+      setRiotId(savedRiotId);
     }
   }, []); // Load once on mount
 
@@ -57,7 +58,7 @@ export default function Home() {
     if (currentSummoner && !riotId) {
       // If Riot ID is not in localStorage, try to get it from currentSummoner.name
       // But ideally it should be saved from the search
-      const savedRiotId = localStorage.getItem('riot_id');
+      const savedRiotId = StorageService.getRiotId();
       if (savedRiotId) {
         setRiotId(savedRiotId);
       }
@@ -82,8 +83,8 @@ export default function Home() {
     setError(null);
 
     try {
-      const apiKey = localStorage.getItem('riot_api_key');
-      const region = localStorage.getItem('riot_api_region') || currentSummoner.region;
+      const apiKey = StorageService.getApiKey();
+      const region = StorageService.getApiRegion() || currentSummoner.region;
       
       if (!apiKey) {
         alert('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
@@ -94,7 +95,7 @@ export default function Home() {
 
       // 1. Update summoner info
       try {
-        const summonerResponse = await fetch(`/api/riot/summoner-by-puuid?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&apiKey=${encodeURIComponent(apiKey)}`);
+        const summonerResponse = await fetch(`${API_ENDPOINTS.RIOT.SUMMONER_BY_PUUID}?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&apiKey=${encodeURIComponent(apiKey)}`);
         if (summonerResponse.ok) {
           const summonerData = await summonerResponse.json();
           const updatedSummoner: Summoner = {
@@ -113,23 +114,11 @@ export default function Home() {
 
       // 2. Update league entry
       try {
-        const leagueResponse = await fetch(`/api/riot/league-by-puuid?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&apiKey=${encodeURIComponent(apiKey)}`);
+        const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&apiKey=${encodeURIComponent(apiKey)}`);
         if (leagueResponse.ok) {
           const leagueData = await leagueResponse.json();
           if (leagueData.entry) {
-            const entry: LeagueEntry = {
-              leagueId: leagueData.entry.leagueId || '',
-              queueType: leagueData.entry.queueType || '',
-              tier: leagueData.entry.tier || '',
-              rank: leagueData.entry.rank || '',
-              leaguePoints: leagueData.entry.leaguePoints || 0,
-              wins: leagueData.entry.wins || 0,
-              losses: leagueData.entry.losses || 0,
-              veteran: leagueData.entry.veteran || false,
-              inactive: leagueData.entry.inactive || false,
-              freshBlood: leagueData.entry.freshBlood || false,
-              hotStreak: leagueData.entry.hotStreak || false,
-            };
+            const entry = extractLeagueEntry(leagueData.entry);
             setCurrentLeagueEntry(entry);
           }
         }
@@ -139,7 +128,7 @@ export default function Home() {
 
       // 3. Fetch and update rate history
       try {
-        const rateHistoryResponse = await fetch('/api/riot/fetch-rate-history', {
+        const rateHistoryResponse = await fetch(API_ENDPOINTS.RIOT.FETCH_RATE_HISTORY, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

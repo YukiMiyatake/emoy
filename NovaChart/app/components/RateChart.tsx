@@ -17,6 +17,7 @@ import { useAppStore } from '@/lib/store/useAppStore';
 import { tierRankToLP, lpToTierRank } from '@/lib/riot/client';
 import { calculateMovingAverage, generatePredictionPoints } from '@/lib/analytics/prediction';
 import { Goal, RateHistory } from '@/types';
+import { formatDateShort } from '@/lib/utils/date';
 
 interface ChartDataPoint {
   date: string;
@@ -91,9 +92,7 @@ export default function RateChart() {
       const dateTime = new Date(entry.date).getTime();
       const totalLP = tierRankToLP(entry.tier, entry.rank, entry.lp);
       const date = new Date(entry.date);
-      const month = date.getMonth() + 1;
-      const day = date.getDate();
-      const dateStr = `${month}/${day}`;
+      const dateStr = formatDateShort(date);
       console.log(`[RateChart] Entry: ${dateStr} - ${entry.tier} ${entry.rank} ${entry.lp}LP = Total LP: ${totalLP}`);
       return {
         date: dateStr,

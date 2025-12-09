@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const API_KEY_STORAGE_KEY = 'riot_api_key';
-const API_REGION_STORAGE_KEY = 'riot_api_region';
+import { STORAGE_KEYS, DEFAULTS } from '@/lib/constants';
+import { StorageService } from '@/lib/utils/storage';
 
 interface ApiKeySettingsProps {
   isExpanded?: boolean;
@@ -15,7 +14,7 @@ export default function ApiKeySettings({
   setIsExpanded: setIsExpandedProp 
 }: ApiKeySettingsProps = {}) {
   const [apiKey, setApiKey] = useState('');
-  const [region, setRegion] = useState('jp1');
+  const [region, setRegion] = useState(DEFAULTS.REGION);
   const [isSaved, setIsSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [internalExpanded, setInternalExpanded] = useState(true);
@@ -26,8 +25,8 @@ export default function ApiKeySettings({
 
   useEffect(() => {
     // Load from localStorage
-    const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    const savedRegion = localStorage.getItem(API_REGION_STORAGE_KEY);
+    const savedKey = StorageService.getApiKey();
+    const savedRegion = StorageService.getApiRegion();
     if (savedKey) {
       setApiKey(savedKey);
     }
@@ -38,18 +37,18 @@ export default function ApiKeySettings({
 
   const handleSave = () => {
     if (apiKey.trim()) {
-      localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
-      localStorage.setItem(API_REGION_STORAGE_KEY, region);
+      StorageService.setApiKey(apiKey);
+      StorageService.setApiRegion(region);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2000);
     }
   };
 
   const handleClear = () => {
-    localStorage.removeItem(API_KEY_STORAGE_KEY);
-    localStorage.removeItem(API_REGION_STORAGE_KEY);
+    StorageService.removeApiKey();
+    StorageService.removeApiRegion();
     setApiKey('');
-    setRegion('jp1');
+    setRegion(DEFAULTS.REGION);
   };
 
   return (

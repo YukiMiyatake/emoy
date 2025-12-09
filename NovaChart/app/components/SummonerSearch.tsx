@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { Summoner, LeagueEntry } from '@/types';
-
-const API_KEY_STORAGE_KEY = 'riot_api_key';
-const API_REGION_STORAGE_KEY = 'riot_api_region';
-const RIOT_ID_STORAGE_KEY = 'riot_id';
-const GAME_NAME_STORAGE_KEY = 'riot_game_name'; // For backward compatibility
-const TAG_LINE_STORAGE_KEY = 'riot_tag_line'; // For backward compatibility
+import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
+import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
+import { StorageService } from '@/lib/utils/storage';
+import { getDateKey } from '@/lib/utils/date';
 
 interface SummonerSearchProps {
   isExpanded?: boolean;
@@ -23,7 +21,7 @@ export default function SummonerSearch({
 }: SummonerSearchProps = {}) {
   const { setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError } = useAppStore();
   const [riotId, setRiotId] = useState('');
-  const [region, setRegion] = useState('jp1');
+  const [region, setRegion] = useState(DEFAULTS.REGION);
   const [isSearching, setIsSearching] = useState(false);
   const [internalExpanded, setInternalExpanded] = useState(true);
   
@@ -33,12 +31,8 @@ export default function SummonerSearch({
 
   useEffect(() => {
     // Load saved values from localStorage
-    const savedRegion = localStorage.getItem(API_REGION_STORAGE_KEY);
-    const savedRiotId = localStorage.getItem(RIOT_ID_STORAGE_KEY);
-    
-    // For backward compatibility, also check old keys
-    const savedGameName = localStorage.getItem(GAME_NAME_STORAGE_KEY);
-    const savedTagLine = localStorage.getItem(TAG_LINE_STORAGE_KEY);
+    const savedRegion = StorageService.getApiRegion();
+    const savedRiotId = StorageService.getRiotId();
     
     if (savedRegion) {
       setRegion(savedRegion);
@@ -46,23 +40,25 @@ export default function SummonerSearch({
     
     if (savedRiotId) {
       setRiotId(savedRiotId);
-    } else if (savedGameName && savedTagLine) {
-      // Migrate from old format
-      setRiotId(`${savedGameName}#${savedTagLine}`);
-      localStorage.setItem(RIOT_ID_STORAGE_KEY, `${savedGameName}#${savedTagLine}`);
+    } else {
+      // For backward compatibility, try to migrate from old format
+      const migratedRiotId = StorageService.migrateOldFormat();
+      if (migratedRiotId) {
+        setRiotId(migratedRiotId);
+      }
     }
   }, []);
 
   // Save riotId to localStorage when it changes
   useEffect(() => {
     if (riotId.trim()) {
-      localStorage.setItem(RIOT_ID_STORAGE_KEY, riotId);
+      StorageService.setRiotId(riotId);
     }
   }, [riotId]);
 
   useEffect(() => {
     if (region) {
-      localStorage.setItem(API_REGION_STORAGE_KEY, region);
+      StorageService.setApiRegion(region);
     }
   }, [region]);
 
@@ -87,8 +83,8 @@ export default function SummonerSearch({
 
     try {
       // Get API key from localStorage
-      const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-      const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
+      const apiKey = StorageService.getApiKey();
+      const currentRegion = StorageService.getApiRegion() || region;
       
       if (!apiKey) {
         const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
@@ -99,7 +95,7 @@ export default function SummonerSearch({
         return;
       }
       
-      const url = `/api/riot/account/by-riot-id?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&region=${currentRegion}&apiKey=${encodeURIComponent(apiKey)}`;
+      const url = `${API_ENDPOINTS.RIOT.ACCOUNT_BY_RIOT_ID}?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&region=${currentRegion}&apiKey=${encodeURIComponent(apiKey)}`;
       const response = await fetch(url);
       
       if (response.ok) {
@@ -143,8 +139,8 @@ export default function SummonerSearch({
             console.warn('[SummonerSearch] Summoner name is missing, fetching from API...');
             try {
               const { RiotApiClient } = await import('@/lib/riot/client');
-              const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-              const currentRegion = localStorage.getItem(API_REGION_STORAGE_KEY) || region;
+              const apiKey = StorageService.getApiKey();
+              const currentRegion = StorageService.getApiRegion() || region;
               if (apiKey) {
                 const client = new RiotApiClient(apiKey, currentRegion);
                 const fullSummonerData = await client.getSummonerByPuuid(summonerData.puuid);
@@ -183,24 +179,12 @@ export default function SummonerSearch({
           
           // Fetch league entry to display current rank
           try {
-            const leagueResponse = await fetch(`/api/riot/league-by-puuid?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
+            const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
             if (leagueResponse.ok) {
               const leagueData = await leagueResponse.json();
               if (leagueData.entry) {
                 // Extract only LeagueEntry fields to avoid including extra fields
-                const entry: LeagueEntry = {
-                  leagueId: leagueData.entry.leagueId || '',
-                  queueType: leagueData.entry.queueType || '',
-                  tier: leagueData.entry.tier || '',
-                  rank: leagueData.entry.rank || '',
-                  leaguePoints: leagueData.entry.leaguePoints || 0,
-                  wins: leagueData.entry.wins || 0,
-                  losses: leagueData.entry.losses || 0,
-                  veteran: leagueData.entry.veteran || false,
-                  inactive: leagueData.entry.inactive || false,
-                  freshBlood: leagueData.entry.freshBlood || false,
-                  hotStreak: leagueData.entry.hotStreak || false,
-                };
+                const entry = extractLeagueEntry(leagueData.entry);
                 setCurrentLeagueEntry(entry);
               }
             }
@@ -274,7 +258,7 @@ export default function SummonerSearch({
       }
 
       console.log('[SummonerSearch] Automatically fetching rate history from match history...');
-      const response = await fetch('/api/riot/fetch-rate-history', {
+      const response = await fetch(API_ENDPOINTS.RIOT.FETCH_RATE_HISTORY, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -309,14 +293,14 @@ export default function SummonerSearch({
         const existingByDate = new Map<string, number>();
         currentRateHistory.forEach(entry => {
           const entryDate = new Date(entry.date);
-          const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
+          const dateKey = getDateKey(entryDate);
           existingByDate.set(dateKey, (existingByDate.get(dateKey) || 0) + 1);
         });
         
         for (const entry of result.rateHistory) {
           try {
             const entryDate = new Date(entry.date);
-            const dateKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
+            const dateKey = getDateKey(entryDate);
             const existedBefore = existingByDate.has(dateKey);
             
             await addRateHistory({
@@ -352,7 +336,7 @@ export default function SummonerSearch({
       if (result.currentEntry && !currentState.currentLeagueEntry) {
         setCurrentLeagueEntry({
           leagueId: '',
-          queueType: 'RANKED_SOLO_5x5',
+          queueType: DEFAULTS.QUEUE_TYPE,
           tier: result.currentEntry.tier,
           rank: result.currentEntry.rank,
           leaguePoints: result.currentEntry.lp,
