@@ -9,6 +9,7 @@ import StatsPanel from './components/StatsPanel';
 import MatchDetailsPanel from './components/MatchDetailsPanel';
 import LaneStatsPanel from './components/LaneStatsPanel';
 import WinLossAnalysis from './components/WinLossAnalysis';
+import TimeOfDayAnalysis from './components/TimeOfDayAnalysis';
 import SkillGoalSetting from './components/SkillGoalSetting';
 import MotivationPanel from './components/MotivationPanel';
 import ApiKeySettings from './components/ApiKeySettings';
@@ -484,6 +485,7 @@ export default function Home() {
             <MatchDetailsPanel />
             <LaneStatsPanel />
             <WinLossAnalysis />
+            <TimeOfDayAnalysis />
           </div>
           <div className="space-y-6">
             <GoalSetting />
