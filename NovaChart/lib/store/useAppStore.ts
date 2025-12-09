@@ -11,8 +11,8 @@
  */
 
 import { create } from 'zustand';
-import { RateHistory, Goal, Match, Summoner, LeagueEntry } from '@/types';
-import { rateHistoryService, goalService, matchService, summonerService } from '@/lib/db';
+import { RateHistory, Goal, Match, Summoner, LeagueEntry, SkillGoal } from '@/types';
+import { rateHistoryService, goalService, matchService, summonerService, skillGoalService } from '@/lib/db';
 import { logger } from '@/lib/utils/logger';
 
 type StoreError = unknown;
@@ -31,6 +31,7 @@ interface AppState {
   rateHistory: RateHistory[];
   goals: Goal[];
   matches: Match[];
+  skillGoals: SkillGoal[];
   currentSummoner: Summoner | null;
   currentLeagueEntry: LeagueEntry | null; // Added
   isLoading: boolean;
@@ -46,6 +47,10 @@ interface AppState {
   deleteGoal: (id: number) => Promise<void>;
   loadMatches: () => Promise<void>;
   addMatch: (match: Omit<Match, 'id'>) => Promise<void>;
+  loadSkillGoals: () => Promise<void>;
+  addSkillGoal: (goal: Omit<SkillGoal, 'id'>) => Promise<void>;
+  updateSkillGoal: (id: number, changes: Partial<SkillGoal>) => Promise<void>;
+  deleteSkillGoal: (id: number) => Promise<void>;
   setCurrentSummoner: (summoner: Summoner | null) => void;
   setCurrentLeagueEntry: (entry: LeagueEntry | null) => void;
   setError: (error: string | null) => void;
@@ -79,6 +84,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rateHistory: [],
   goals: [],
   matches: [],
+  skillGoals: [],
   currentSummoner: null,
   currentLeagueEntry: null,
   isLoading: false,
@@ -172,6 +178,46 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().loadMatches();
     } catch (error) {
       handleStoreError(set, error, 'Failed to add match');
+    }
+  },
+
+  loadSkillGoals: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      const goals = await skillGoalService.getAll();
+      set({ skillGoals: goals, isLoading: false });
+    } catch (error) {
+      handleStoreError(set, error, 'Failed to load skill goals');
+    }
+  },
+
+  addSkillGoal: async (goal) => {
+    try {
+      set({ isLoading: true, error: null });
+      await skillGoalService.add(goal);
+      await get().loadSkillGoals();
+    } catch (error) {
+      handleStoreError(set, error, 'Failed to add skill goal');
+    }
+  },
+
+  updateSkillGoal: async (id, changes) => {
+    try {
+      set({ isLoading: true, error: null });
+      await skillGoalService.update(id, changes);
+      await get().loadSkillGoals();
+    } catch (error) {
+      handleStoreError(set, error, 'Failed to update skill goal');
+    }
+  },
+
+  deleteSkillGoal: async (id) => {
+    try {
+      set({ isLoading: true, error: null });
+      await skillGoalService.delete(id);
+      await get().loadSkillGoals();
+    } catch (error) {
+      handleStoreError(set, error, 'Failed to delete skill goal');
     }
   },
 

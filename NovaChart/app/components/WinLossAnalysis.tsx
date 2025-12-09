@@ -2,23 +2,25 @@
 
 import { useMemo } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { analyzeWinLoss, calculateDifferencePercentage, ImprovementSuggestion } from '@/lib/analytics/winLossAnalysis';
+import { analyzeWinLoss, analyzeWinLossByLane, calculateDifferencePercentage, getLaneName, ImprovementSuggestion } from '@/lib/analytics/winLossAnalysis';
 
 export default function WinLossAnalysis() {
   const { matches } = useAppStore();
 
-  const analysis = useMemo(() => {
-    return analyzeWinLoss(matches);
+  const laneAnalyses = useMemo(() => {
+    return analyzeWinLossByLane(matches);
   }, [matches]);
 
-  if (!analysis) {
+  const validLaneAnalyses = laneAnalyses.filter(la => la.analysis !== null);
+
+  if (validLaneAnalyses.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold mb-4">勝敗分析</h2>
         <p className="text-gray-500">
           {matches.length === 0
             ? '試合データがありません'
-            : '勝利試合または敗北試合のデータが不足しています'}
+            : 'レーン別の試合データが不足しています'}
         </p>
       </div>
     );
@@ -48,194 +50,85 @@ export default function WinLossAnalysis() {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">勝敗分析</h2>
+      <h2 className="text-2xl font-bold mb-4">勝敗分析（レーン別）</h2>
 
-      {/* 試合数サマリー */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="p-4 bg-green-50 dark:bg-green-900 rounded">
-          <p className="text-sm text-gray-600 dark:text-gray-400">勝利試合</p>
-          <p className="text-3xl font-bold">{analysis.wins.count}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            勝率: {Math.round((analysis.wins.count / (analysis.wins.count + analysis.losses.count)) * 100)}%
-          </p>
-        </div>
-        <div className="p-4 bg-red-50 dark:bg-red-900 rounded">
-          <p className="text-sm text-gray-600 dark:text-gray-400">敗北試合</p>
-          <p className="text-3xl font-bold">{analysis.losses.count}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            敗率: {Math.round((analysis.losses.count / (analysis.wins.count + analysis.losses.count)) * 100)}%
-          </p>
-        </div>
-      </div>
+      <div className="space-y-6">
+        {validLaneAnalyses.map(({ lane, analysis }) => {
+          if (!analysis) return null;
 
-      {/* 主要指標の比較 */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-4">主要指標の比較</h3>
-        <div className="space-y-4">
-          {/* KDA */}
-          <ComparisonBar
-            label="平均KDA"
-            winValue={analysis.wins.averageKDA}
-            lossValue={analysis.losses.averageKDA}
-            difference={analysis.differences.kda}
-            formatValue={(v) => v.toFixed(2)}
-          />
+          return (
+            <div key={lane} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <h3 className="text-xl font-semibold mb-4">{getLaneName(lane)}</h3>
 
-          {/* CS/分 */}
-          <ComparisonBar
-            label="平均CS/分"
-            winValue={analysis.wins.averageCSPerMin}
-            lossValue={analysis.losses.averageCSPerMin}
-            difference={analysis.differences.csPerMin}
-            formatValue={(v) => v.toFixed(1)}
-          />
+              {/* 試合数サマリー */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="p-3 bg-green-50 dark:bg-green-900 rounded">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">勝利試合</p>
+                  <p className="text-2xl font-bold">{analysis.wins.count}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    勝率: {Math.round((analysis.wins.count / (analysis.wins.count + analysis.losses.count)) * 100)}%
+                  </p>
+                </div>
+                <div className="p-3 bg-red-50 dark:bg-red-900 rounded">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">敗北試合</p>
+                  <p className="text-2xl font-bold">{analysis.losses.count}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    敗率: {Math.round((analysis.losses.count / (analysis.wins.count + analysis.losses.count)) * 100)}%
+                  </p>
+                </div>
+              </div>
 
-          {/* ダメージ/分 */}
-          <ComparisonBar
-            label="平均ダメージ/分"
-            winValue={analysis.wins.averageDamagePerMin}
-            lossValue={analysis.losses.averageDamagePerMin}
-            difference={analysis.differences.damagePerMin}
-            formatValue={(v) => v.toLocaleString()}
-          />
-
-          {/* ビジョンスコア */}
-          <ComparisonBar
-            label="平均ビジョンスコア"
-            winValue={analysis.wins.averageVisionScore}
-            lossValue={analysis.losses.averageVisionScore}
-            difference={analysis.differences.visionScore}
-            formatValue={(v) => v.toFixed(1)}
-          />
-
-          {/* キル参加率 */}
-          <ComparisonBar
-            label="平均キル参加率"
-            winValue={analysis.wins.averageKillParticipation}
-            lossValue={analysis.losses.averageKillParticipation}
-            difference={analysis.differences.killParticipation}
-            formatValue={(v) => `${v.toFixed(1)}%`}
-          />
-
-          {/* 平均デス数 */}
-          <ComparisonBar
-            label="平均デス数"
-            winValue={analysis.wins.averageDeaths}
-            lossValue={analysis.losses.averageDeaths}
-            difference={analysis.differences.deaths}
-            formatValue={(v) => v.toFixed(1)}
-            reverse={true} // デス数は少ない方が良い
-          />
-        </div>
-      </div>
-
-      {/* 詳細統計 */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-4">詳細統計</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded">
-            <h4 className="font-semibold mb-2 text-green-600 dark:text-green-400">勝利試合</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均キル</span>
-                <span className="font-semibold">{analysis.wins.averageKills.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均デス</span>
-                <span className="font-semibold">{analysis.wins.averageDeaths.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均アシスト</span>
-                <span className="font-semibold">{analysis.wins.averageAssists.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均CS</span>
-                <span className="font-semibold">{analysis.wins.averageCS}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均ダメージ</span>
-                <span className="font-semibold">{analysis.wins.averageDamage.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均ゴールド</span>
-                <span className="font-semibold">{analysis.wins.averageGoldEarned.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded">
-            <h4 className="font-semibold mb-2 text-red-600 dark:text-red-400">敗北試合</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均キル</span>
-                <span className="font-semibold">{analysis.losses.averageKills.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均デス</span>
-                <span className="font-semibold">{analysis.losses.averageDeaths.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均アシスト</span>
-                <span className="font-semibold">{analysis.losses.averageAssists.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均CS</span>
-                <span className="font-semibold">{analysis.losses.averageCS}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均ダメージ</span>
-                <span className="font-semibold">{analysis.losses.averageDamage.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">平均ゴールド</span>
-                <span className="font-semibold">{analysis.losses.averageGoldEarned.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 改善提案 */}
-      {analysis.improvementSuggestions.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4">改善提案</h3>
-          <div className="space-y-3">
-            {analysis.improvementSuggestions.map((suggestion, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg border-l-4 ${
-                  suggestion.priority === 'high'
-                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                    : suggestion.priority === 'medium'
-                    ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-                    : 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getPriorityColor(suggestion.priority)}`}>
-                        {getPriorityLabel(suggestion.priority)}優先度
-                      </span>
-                      <span className="font-semibold">{suggestion.category}</span>
-                      <span className="text-gray-600 dark:text-gray-400">-</span>
-                      <span className="text-gray-600 dark:text-gray-400">{suggestion.metric}</span>
-                    </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{suggestion.description}</p>
+              {/* 改善提案 */}
+              {analysis.improvementSuggestions.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold mb-3">改善提案</h4>
+                  <div className="space-y-2">
+                    {analysis.improvementSuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border-l-4 ${
+                          suggestion.priority === 'high'
+                            ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                            : suggestion.priority === 'medium'
+                            ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+                            : 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getPriorityColor(suggestion.priority)}`}>
+                                {getPriorityLabel(suggestion.priority)}優先度
+                              </span>
+                              <span className="font-semibold text-sm">{suggestion.category}</span>
+                              <span className="text-gray-600 dark:text-gray-400 text-sm">-</span>
+                              <span className="text-gray-600 dark:text-gray-400 text-sm">{suggestion.metric}</span>
+                            </div>
+                            <p className="text-xs text-gray-700 dark:text-gray-300">{suggestion.description}</p>
+                          </div>
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          現在: {typeof suggestion.currentValue === 'number' && suggestion.currentValue % 1 !== 0
+                            ? suggestion.currentValue.toFixed(1)
+                            : suggestion.currentValue.toLocaleString()} → 目標: {typeof suggestion.targetValue === 'number' && suggestion.targetValue % 1 !== 0
+                            ? suggestion.targetValue.toFixed(1)
+                            : suggestion.targetValue.toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                  現在: {typeof suggestion.currentValue === 'number' && suggestion.currentValue % 1 !== 0
-                    ? suggestion.currentValue.toFixed(1)
-                    : suggestion.currentValue.toLocaleString()} → 目標: {typeof suggestion.targetValue === 'number' && suggestion.targetValue % 1 !== 0
-                    ? suggestion.targetValue.toFixed(1)
-                    : suggestion.targetValue.toLocaleString()}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              )}
+
+              {analysis.improvementSuggestions.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  このレーンでは改善提案がありません
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -67,3 +67,17 @@ export interface LeagueEntry {
   hotStreak: boolean;
 }
 
+export type SkillGoalType = 'CS_AT_10' | 'KDA' | 'VISION_SCORE' | 'DAMAGE' | 'CSPERMIN' | 'DAMAGE_PER_MIN';
+
+export interface SkillGoal {
+  id?: number;
+  type: SkillGoalType;
+  targetValue: number;
+  lanes?: string[]; // TOP, JUNGLE, MID, ADC, SUPPORT (optional, empty array means all lanes)
+  createdAt: Date;
+  isActive: boolean;
+  description?: string; // ユーザーが設定した説明（オプション）
+  // 後方互換性のため（既存データ用）
+  lane?: string; // 非推奨: lanesを使用してください
+}
+

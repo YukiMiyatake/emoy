@@ -6,6 +6,13 @@
 
 import { Match } from '@/types';
 
+export type Lane = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
+
+export interface LaneWinLossAnalysis {
+  lane: Lane;
+  analysis: WinLossComparison | null;
+}
+
 export interface WinLossComparison {
   wins: {
     count: number;
@@ -269,6 +276,7 @@ function generateImprovementSuggestions(
   const suggestions: ImprovementSuggestion[] = [];
 
   // デス数の改善（優先度: 高）
+  // 勝利試合の方がデス数が少ない（良い）場合のみ提案
   if (differences.deaths < -1) {
     suggestions.push({
       category: 'サバイバル',
@@ -282,80 +290,86 @@ function generateImprovementSuggestions(
   }
 
   // CS/分の改善（優先度: 高）
-  if (differences.csPerMin < -1) {
+  // 勝利試合の方がCS/分が高い（良い）場合のみ提案
+  if (differences.csPerMin > 1) {
     suggestions.push({
       category: 'ファーミング',
       metric: '平均CS/分',
       currentValue: lossStats.averageCSPerMin,
       targetValue: winStats.averageCSPerMin,
-      difference: Math.abs(differences.csPerMin),
+      difference: differences.csPerMin,
       priority: 'high',
-      description: `敗北試合では平均${lossStats.averageCSPerMin.toFixed(1)}CS/分、勝利試合では${winStats.averageCSPerMin.toFixed(1)}CS/分です。CS/分を${Math.abs(differences.csPerMin).toFixed(1)}向上させることで経済力が向上します。`,
+      description: `敗北試合では平均${lossStats.averageCSPerMin.toFixed(1)}CS/分、勝利試合では${winStats.averageCSPerMin.toFixed(1)}CS/分です。CS/分を${differences.csPerMin.toFixed(1)}向上させることで経済力が向上します。`,
     });
   }
 
   // ダメージ/分の改善（優先度: 高）
-  if (differences.damagePerMin < -200) {
+  // 勝利試合の方がダメージ/分が高い（良い）場合のみ提案
+  if (differences.damagePerMin > 200) {
     suggestions.push({
       category: 'ダメージ',
       metric: '平均ダメージ/分',
       currentValue: lossStats.averageDamagePerMin,
       targetValue: winStats.averageDamagePerMin,
-      difference: Math.abs(differences.damagePerMin),
+      difference: differences.damagePerMin,
       priority: 'high',
-      description: `敗北試合では平均${lossStats.averageDamagePerMin.toLocaleString()}ダメージ/分、勝利試合では${winStats.averageDamagePerMin.toLocaleString()}ダメージ/分です。ダメージ/分を${Math.abs(differences.damagePerMin).toLocaleString()}向上させることで影響力が向上します。`,
+      description: `敗北試合では平均${lossStats.averageDamagePerMin.toLocaleString()}ダメージ/分、勝利試合では${winStats.averageDamagePerMin.toLocaleString()}ダメージ/分です。ダメージ/分を${differences.damagePerMin.toLocaleString()}向上させることで影響力が向上します。`,
     });
   }
 
   // ビジョンスコアの改善（優先度: 中）
-  if (differences.visionScore < -5) {
+  // 勝利試合の方がビジョンスコアが高い（良い）場合のみ提案
+  if (differences.visionScore > 5) {
     suggestions.push({
       category: 'ビジョン',
       metric: '平均ビジョンスコア',
       currentValue: lossStats.averageVisionScore,
       targetValue: winStats.averageVisionScore,
-      difference: Math.abs(differences.visionScore),
+      difference: differences.visionScore,
       priority: 'medium',
-      description: `敗北試合では平均${lossStats.averageVisionScore.toFixed(1)}ビジョンスコア、勝利試合では${winStats.averageVisionScore.toFixed(1)}です。ビジョンスコアを${Math.abs(differences.visionScore).toFixed(1)}向上させることでマップコントロールが向上します。`,
+      description: `敗北試合では平均${lossStats.averageVisionScore.toFixed(1)}ビジョンスコア、勝利試合では${winStats.averageVisionScore.toFixed(1)}です。ビジョンスコアを${differences.visionScore.toFixed(1)}向上させることでマップコントロールが向上します。`,
     });
   }
 
   // キル参加率の改善（優先度: 中）
-  if (differences.killParticipation < -5) {
+  // 勝利試合の方がキル参加率が高い（良い）場合のみ提案
+  if (differences.killParticipation > 5) {
     suggestions.push({
       category: 'チームプレイ',
       metric: '平均キル参加率',
       currentValue: lossStats.averageKillParticipation,
       targetValue: winStats.averageKillParticipation,
-      difference: Math.abs(differences.killParticipation),
+      difference: differences.killParticipation,
       priority: 'medium',
-      description: `敗北試合では平均${lossStats.averageKillParticipation.toFixed(1)}%キル参加率、勝利試合では${winStats.averageKillParticipation.toFixed(1)}%です。キル参加率を${Math.abs(differences.killParticipation).toFixed(1)}%向上させることでチームへの貢献が向上します。`,
+      description: `敗北試合では平均${lossStats.averageKillParticipation.toFixed(1)}%キル参加率、勝利試合では${winStats.averageKillParticipation.toFixed(1)}%です。キル参加率を${differences.killParticipation.toFixed(1)}%向上させることでチームへの貢献が向上します。`,
     });
   }
 
   // KDAの改善（優先度: 中）
-  if (differences.kda < -0.5) {
+  // 勝利試合の方がKDAが高い（良い）場合のみ提案
+  if (differences.kda > 0.5) {
     suggestions.push({
       category: 'パフォーマンス',
       metric: '平均KDA',
       currentValue: lossStats.averageKDA,
       targetValue: winStats.averageKDA,
-      difference: Math.abs(differences.kda),
+      difference: differences.kda,
       priority: 'medium',
-      description: `敗北試合では平均KDA${lossStats.averageKDA.toFixed(2)}、勝利試合では${winStats.averageKDA.toFixed(2)}です。KDAを${Math.abs(differences.kda).toFixed(2)}向上させることで全体的なパフォーマンスが向上します。`,
+      description: `敗北試合では平均KDA${lossStats.averageKDA.toFixed(2)}、勝利試合では${winStats.averageKDA.toFixed(2)}です。KDAを${differences.kda.toFixed(2)}向上させることで全体的なパフォーマンスが向上します。`,
     });
   }
 
   // アシスト数の改善（優先度: 低）
-  if (differences.assists < -1) {
+  // 勝利試合の方がアシスト数が高い（良い）場合のみ提案
+  if (differences.assists > 1) {
     suggestions.push({
       category: 'チームプレイ',
       metric: '平均アシスト数',
       currentValue: lossStats.averageAssists,
       targetValue: winStats.averageAssists,
-      difference: Math.abs(differences.assists),
+      difference: differences.assists,
       priority: 'low',
-      description: `敗北試合では平均${lossStats.averageAssists.toFixed(1)}アシスト、勝利試合では${winStats.averageAssists.toFixed(1)}アシストです。アシスト数を${Math.abs(differences.assists).toFixed(1)}向上させることでチームへの貢献が向上します。`,
+      description: `敗北試合では平均${lossStats.averageAssists.toFixed(1)}アシスト、勝利試合では${winStats.averageAssists.toFixed(1)}アシストです。アシスト数を${differences.assists.toFixed(1)}向上させることでチームへの貢献が向上します。`,
     });
   }
 
@@ -374,5 +388,40 @@ function generateImprovementSuggestions(
 export function calculateDifferencePercentage(winValue: number, lossValue: number): number {
   if (lossValue === 0) return 0;
   return Math.round(((winValue - lossValue) / lossValue) * 100 * 10) / 10;
+}
+
+/**
+ * レーン別の勝敗分析を実行
+ * @param matches 試合データの配列
+ * @returns レーン別の勝敗分析結果
+ */
+export function analyzeWinLossByLane(matches: Match[]): LaneWinLossAnalysis[] {
+  const lanes: Lane[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+  const results: LaneWinLossAnalysis[] = [];
+
+  lanes.forEach(lane => {
+    const laneMatches = matches.filter(m => m.lane === lane);
+    const analysis = analyzeWinLoss(laneMatches);
+    results.push({
+      lane,
+      analysis,
+    });
+  });
+
+  return results;
+}
+
+/**
+ * レーン名を日本語に変換
+ */
+export function getLaneName(lane: Lane): string {
+  const laneNames: Record<Lane, string> = {
+    'TOP': 'トップ',
+    'JUNGLE': 'ジャングル',
+    'MID': 'ミッド',
+    'ADC': 'ADC',
+    'SUPPORT': 'サポート',
+  };
+  return laneNames[lane] || lane;
 }
 

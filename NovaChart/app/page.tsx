@@ -9,6 +9,7 @@ import StatsPanel from './components/StatsPanel';
 import MatchDetailsPanel from './components/MatchDetailsPanel';
 import LaneStatsPanel from './components/LaneStatsPanel';
 import WinLossAnalysis from './components/WinLossAnalysis';
+import SkillGoalSetting from './components/SkillGoalSetting';
 import ApiKeySettings from './components/ApiKeySettings';
 import { Summoner, LeagueEntry, Match } from '@/types';
 import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
@@ -17,7 +18,7 @@ import { StorageService } from '@/lib/utils/storage';
 import { logger } from '@/lib/utils/logger';
 
 export default function Home() {
-  const { loadRateHistory, loadGoals, loadMatches, currentSummoner, currentLeagueEntry, setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, addRateHistory, addMatch } = useAppStore();
+  const { loadRateHistory, loadGoals, loadMatches, loadSkillGoals, currentSummoner, currentLeagueEntry, setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, addRateHistory, addMatch } = useAppStore();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [isApiKeyExpanded, setIsApiKeyExpanded] = useState(false);
   const [riotId, setRiotId] = useState<string>('');
@@ -28,6 +29,7 @@ export default function Home() {
     loadRateHistory();
     loadGoals();
     loadMatches();
+    loadSkillGoals();
     
     // Load saved summoner from database and fetch solo queue league entry
     const loadSavedSummoner = async () => {
@@ -106,7 +108,7 @@ export default function Home() {
     };
     
     loadSavedSummoner();
-  }, [loadRateHistory, loadGoals, loadMatches, setCurrentSummoner, setCurrentLeagueEntry]);
+  }, [loadRateHistory, loadGoals, loadMatches, loadSkillGoals, setCurrentSummoner, setCurrentLeagueEntry]);
 
   useEffect(() => {
     // Load Riot ID from localStorage
@@ -484,6 +486,7 @@ export default function Home() {
           </div>
           <div className="space-y-6">
             <GoalSetting />
+            <SkillGoalSetting />
             <StatsPanel />
           </div>
         </div>
