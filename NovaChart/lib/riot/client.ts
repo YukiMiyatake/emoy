@@ -1,4 +1,5 @@
 import { Summoner, LeagueEntry } from '@/types';
+import { logger } from '@/lib/utils/logger';
 
 // Riot Games API base URLs
 // Platform routing (for summoner-v4, league-v4, etc.)
@@ -48,10 +49,10 @@ export class RiotApiClient {
   }
 
   private async fetchRiotApi<T>(url: string, endpointName?: string): Promise<T> {
-    console.log(`[Riot API] Requesting: ${url}`);
-    console.log(`[Riot API] Endpoint: ${endpointName || 'unknown'}`);
-    console.log(`[Riot API] Region: ${this.region}`);
-    console.log(`[Riot API] API Key prefix: ${this.apiKey.substring(0, 10)}...`);
+    logger.debug(`[Riot API] Requesting: ${url}`);
+    logger.debug(`[Riot API] Endpoint: ${endpointName || 'unknown'}`);
+    logger.debug(`[Riot API] Region: ${this.region}`);
+    logger.debug(`[Riot API] API Key prefix: ${this.apiKey.substring(0, 10)}...`);
     
     const response = await fetch(url, {
       headers: {
@@ -59,8 +60,8 @@ export class RiotApiClient {
       },
     });
 
-    console.log(`[Riot API] Response status: ${response.status} ${response.statusText}`);
-    console.log(`[Riot API] Response headers:`, Object.fromEntries(response.headers.entries()));
+    logger.debug(`[Riot API] Response status: ${response.status} ${response.statusText}`);
+    logger.debug(`[Riot API] Response headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       let errorMessage = '';
@@ -70,7 +71,7 @@ export class RiotApiClient {
       try {
         const errorData = await response.json();
         errorDetails = errorData;
-        console.log(`[Riot API] Error response:`, JSON.stringify(errorData, null, 2));
+        logger.error(`[Riot API] Error response:`, JSON.stringify(errorData, null, 2));
         
         if (errorData.status) {
           errorMessage = errorData.status.message || response.statusText;
@@ -79,7 +80,7 @@ export class RiotApiClient {
         }
       } catch (e) {
         const text = await response.text();
-        console.log(`[Riot API] Error response (text):`, text);
+        logger.error(`[Riot API] Error response (text):`, text);
         errorMessage = response.statusText;
       }
 
@@ -222,11 +223,11 @@ export class RiotApiClient {
   async getLeagueEntriesByPuuid(puuid: string): Promise<LeagueEntry[]> {
     // Use puuid directly as encryptedPUUID (NOT summonerId)
     const url = `${this.getBaseUrl()}/lol/league/v4/entries/by-puuid/${puuid}`;
-    console.log('[RiotApiClient] getLeagueEntriesByPuuid - puuid (encryptedPUUID):', puuid);
-    console.log('[RiotApiClient] getLeagueEntriesByPuuid - API URL:', url);
+    logger.debug('[RiotApiClient] getLeagueEntriesByPuuid - puuid (encryptedPUUID):', puuid);
+    logger.debug('[RiotApiClient] getLeagueEntriesByPuuid - API URL:', url);
     const data = await this.fetchRiotApi<LeagueEntry[]>(url, `GET /lol/league/v4/entries/by-puuid/{encryptedPUUID}`);
-    console.log('[RiotApiClient] getLeagueEntriesByPuuid - League entries count:', data.length);
-    console.log('[RiotApiClient] getLeagueEntriesByPuuid - League entries:', JSON.stringify(data, null, 2));
+    logger.debug('[RiotApiClient] getLeagueEntriesByPuuid - League entries count:', data.length);
+    logger.debug('[RiotApiClient] getLeagueEntriesByPuuid - League entries:', JSON.stringify(data, null, 2));
     return data;
   }
 
@@ -254,9 +255,9 @@ export class RiotApiClient {
     if (queue !== undefined) {
       url += `&queue=${queue}`;
     }
-    console.log('[RiotApiClient] getMatchIdsByPuuid - API URL:', url);
+    logger.debug('[RiotApiClient] getMatchIdsByPuuid - API URL:', url);
     const data = await this.fetchRiotApi<string[]>(url, `GET /lol/match/v5/matches/by-puuid/{puuid}/ids`);
-    console.log('[RiotApiClient] getMatchIdsByPuuid - Match IDs count:', data.length);
+    logger.debug('[RiotApiClient] getMatchIdsByPuuid - Match IDs count:', data.length);
     return data;
   }
 
@@ -267,7 +268,7 @@ export class RiotApiClient {
   async getMatchByMatchId(matchId: string): Promise<any> {
     const regionalUrl = this.getRegionalBaseUrl();
     const url = `${regionalUrl}/lol/match/v5/matches/${matchId}`;
-    console.log('[RiotApiClient] getMatchByMatchId - API URL:', url);
+    logger.debug('[RiotApiClient] getMatchByMatchId - API URL:', url);
     const data = await this.fetchRiotApi<any>(url, `GET /lol/match/v5/matches/{matchId}`);
     return data;
   }
@@ -295,12 +296,12 @@ export class RiotApiClient {
           break; // No more matches
         }
       } catch (error) {
-        console.error('[RiotApiClient] Error fetching match IDs:', error);
+        logger.error('[RiotApiClient] Error fetching match IDs:', error);
         break;
       }
     }
 
-    console.log('[RiotApiClient] getAllRankedMatchIds - Total match IDs:', allMatchIds.length);
+    logger.debug('[RiotApiClient] getAllRankedMatchIds - Total match IDs:', allMatchIds.length);
     return allMatchIds.slice(0, maxMatches);
   }
 }

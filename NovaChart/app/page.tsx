@@ -11,6 +11,7 @@ import { Summoner, LeagueEntry } from '@/types';
 import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
 import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
 import { StorageService } from '@/lib/utils/storage';
+import { logger } from '@/lib/utils/logger';
 
 export default function Home() {
   const { loadRateHistory, loadGoals, loadMatches, currentSummoner, currentLeagueEntry, setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, addRateHistory } = useAppStore();
@@ -38,7 +39,7 @@ export default function Home() {
           setCurrentSummoner(latestSummoner);
         }
       } catch (error) {
-        console.error('[Home] Failed to load saved summoner:', error);
+        logger.error('[Home] Failed to load saved summoner:', error);
       }
     };
     
@@ -109,7 +110,7 @@ export default function Home() {
           await summonerService.addOrUpdate(updatedSummoner);
         }
       } catch (error) {
-        console.warn('[Update] Failed to update summoner info:', error);
+        logger.warn('[Update] Failed to update summoner info:', error);
       }
 
       // 2. Update league entry
@@ -123,7 +124,7 @@ export default function Home() {
           }
         }
       } catch (error) {
-        console.warn('[Update] Failed to update league entry:', error);
+        logger.warn('[Update] Failed to update league entry:', error);
       }
 
       // 3. Fetch and update rate history
@@ -160,12 +161,12 @@ export default function Home() {
                 });
                 successCount++;
               } catch (error) {
-                console.error('[Update] Failed to add rate history entry:', error);
+                logger.error('[Update] Failed to add rate history entry:', error);
                 failedCount++;
               }
             }
             
-            console.log(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed`);
+            logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed`);
           }
 
           // Update league entry if available
@@ -187,13 +188,13 @@ export default function Home() {
           }
         }
       } catch (error) {
-        console.warn('[Update] Failed to fetch rate history:', error);
+        logger.warn('[Update] Failed to fetch rate history:', error);
       }
 
       alert('データを更新しました');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '更新に失敗しました';
-      console.error('[Update] Update error:', error);
+      logger.error('[Update] Update error:', error);
       alert(errorMessage);
     } finally {
       setIsUpdating(false);

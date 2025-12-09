@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RiotApiClient } from '@/lib/riot/client';
+import { logger } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -28,17 +29,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[API Route] /api/riot/account/by-riot-id - GameName: ${gameName}, TagLine: ${tagLine}, Region: ${region}`);
+    logger.debug(`[API Route] /api/riot/account/by-riot-id - GameName: ${gameName}, TagLine: ${tagLine}, Region: ${region}`);
     const client = new RiotApiClient(apiKey, region);
     const account = await client.getAccountByRiotId(gameName, tagLine);
     
     // Get summoner info using PUUID
     const summoner = await client.getSummonerByPuuid(account.puuid);
     
-    console.log('[API Route] /api/riot/account/by-riot-id - Summoner data:', JSON.stringify(summoner, null, 2));
-    console.log('[API Route] /api/riot/account/by-riot-id - Summoner id:', summoner.id);
-    console.log('[API Route] /api/riot/account/by-riot-id - Summoner name:', summoner.name);
-    console.log('[API Route] /api/riot/account/by-riot-id - Summoner puuid:', summoner.puuid);
+    logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner data:', JSON.stringify(summoner, null, 2));
+    logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner id:', summoner.id);
+    logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner name:', summoner.name);
+    logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner puuid:', summoner.puuid);
     
     // Note: Database save should be done on client-side
     return NextResponse.json({
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       summoner,
     });
   } catch (error) {
-    console.error('[API Route] Riot API Error:', error);
+    logger.error('[API Route] Riot API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch account data';
     
     // Return appropriate status code based on error message

@@ -3,6 +3,7 @@ import { RiotApiClient } from '@/lib/riot/client';
 import { LeagueEntry } from '@/types';
 import { DEFAULTS, QUEUE_TYPES, ERROR_MESSAGES } from '@/lib/constants';
 import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
+import { logger } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ entry: leagueEntry });
   } catch (error) {
-    console.error('Riot API Error:', error);
+    logger.error('Riot API Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : ERROR_MESSAGES.FAILED_TO_FETCH_LEAGUE },
       { status: 500 }

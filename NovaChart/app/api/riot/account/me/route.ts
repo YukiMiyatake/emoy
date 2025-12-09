@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RiotApiClient } from '@/lib/riot/client';
+import { logger } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -19,14 +20,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[API Route] /api/riot/account/me - Region: ${region}`);
+    logger.debug(`[API Route] /api/riot/account/me - Region: ${region}`);
     const client = new RiotApiClient(apiKey, region);
     const summoner = await client.getSummonerByMe();
     return NextResponse.json({
       summoner,
     });
   } catch (error) {
-    console.error('[API Route] Riot API Error:', error);
+    logger.error('[API Route] Riot API Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch account data';
     
     // Return appropriate status code based on error message

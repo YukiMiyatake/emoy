@@ -7,6 +7,7 @@ import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
 import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
 import { StorageService } from '@/lib/utils/storage';
 import { getDateKey } from '@/lib/utils/date';
+import { logger } from '@/lib/utils/logger';
 
 interface SummonerSearchProps {
   isExpanded?: boolean;
@@ -69,7 +70,7 @@ export default function SummonerSearch({
     const parts = riotId.split('#');
     if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
       const errorMsg = 'Riot IDを「ゲーム名#タグライン」の形式で入力してください（例: PlayerName#JP1）';
-      console.error('[SummonerSearch] Validation error:', errorMsg);
+      logger.error('[SummonerSearch] Validation error:', errorMsg);
       alert(errorMsg);
       return;
     }
@@ -88,7 +89,7 @@ export default function SummonerSearch({
       
       if (!apiKey) {
         const errorMsg = 'APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。';
-        console.error('[SummonerSearch] API key required:', errorMsg);
+        logger.error('[SummonerSearch] API key required:', errorMsg);
         alert(errorMsg);
         setIsSearching(false);
         setLoading(false);
@@ -100,43 +101,43 @@ export default function SummonerSearch({
       
       if (response.ok) {
           const data = await response.json();
-          console.log('[SummonerSearch] Response data:', data);
-          console.log('[SummonerSearch] Response data type:', typeof data);
-          console.log('[SummonerSearch] Response data keys:', data ? Object.keys(data) : 'data is null/undefined');
-          console.log('[SummonerSearch] data.summoner:', data?.summoner);
-          console.log('[SummonerSearch] data.account:', data?.account);
+          logger.debug('[SummonerSearch] Response data:', data);
+          logger.debug('[SummonerSearch] Response data type:', typeof data);
+          logger.debug('[SummonerSearch] Response data keys:', data ? Object.keys(data) : 'data is null/undefined');
+          logger.debug('[SummonerSearch] data.summoner:', data?.summoner);
+          logger.debug('[SummonerSearch] data.account:', data?.account);
           
           // Check if data has summoner property or is the summoner itself
           const summonerData = data?.summoner || data;
-          console.log('[SummonerSearch] Summoner data:', summonerData);
-          console.log('[SummonerSearch] Summoner data type:', typeof summonerData);
-          console.log('[SummonerSearch] Summoner data keys:', summonerData ? Object.keys(summonerData) : 'summonerData is null/undefined');
-          console.log('[SummonerSearch] Summoner id:', summonerData?.id);
-          console.log('[SummonerSearch] Summoner id type:', typeof summonerData?.id);
-          console.log('[SummonerSearch] Summoner puuid:', summonerData?.puuid);
-          console.log('[SummonerSearch] Summoner puuid type:', typeof summonerData?.puuid);
+          logger.debug('[SummonerSearch] Summoner data:', summonerData);
+          logger.debug('[SummonerSearch] Summoner data type:', typeof summonerData);
+          logger.debug('[SummonerSearch] Summoner data keys:', summonerData ? Object.keys(summonerData) : 'summonerData is null/undefined');
+          logger.debug('[SummonerSearch] Summoner id:', summonerData?.id);
+          logger.debug('[SummonerSearch] Summoner id type:', typeof summonerData?.id);
+          logger.debug('[SummonerSearch] Summoner puuid:', summonerData?.puuid);
+          logger.debug('[SummonerSearch] Summoner puuid type:', typeof summonerData?.puuid);
           
           if (!summonerData) {
-            console.error('[SummonerSearch] Summoner data is null or undefined');
-            console.error('[SummonerSearch] Full response data:', JSON.stringify(data, null, 2));
+            logger.error('[SummonerSearch] Summoner data is null or undefined');
+            logger.error('[SummonerSearch] Full response data:', JSON.stringify(data, null, 2));
             const errorMsg = 'サマナー情報が不正です。レスポンスにサマナー情報が含まれていません。';
-            console.error('[SummonerSearch] Error:', errorMsg);
+            logger.error('[SummonerSearch] Error:', errorMsg);
             throw new Error(errorMsg);
           }
           
           // Check if puuid exists (required)
           if (!summonerData.puuid) {
-            console.error('[SummonerSearch] Invalid summoner data - missing puuid');
-            console.error('[SummonerSearch] Summoner data:', JSON.stringify(summonerData, null, 2));
-            console.error('[SummonerSearch] Full response data:', JSON.stringify(data, null, 2));
+            logger.error('[SummonerSearch] Invalid summoner data - missing puuid');
+            logger.error('[SummonerSearch] Summoner data:', JSON.stringify(summonerData, null, 2));
+            logger.error('[SummonerSearch] Full response data:', JSON.stringify(data, null, 2));
             const errorMsg = `サマナー情報が不正です。puuidが存在しません。`;
-            console.error('[SummonerSearch] Error:', errorMsg);
+            logger.error('[SummonerSearch] Error:', errorMsg);
             throw new Error(errorMsg);
           }
           
           // If name is missing, fetch from summoner API using puuid
           if (!summonerData.name) {
-            console.warn('[SummonerSearch] Summoner name is missing, fetching from API...');
+            logger.warn('[SummonerSearch] Summoner name is missing, fetching from API...');
             try {
               const { RiotApiClient } = await import('@/lib/riot/client');
               const apiKey = StorageService.getApiKey();
@@ -144,7 +145,7 @@ export default function SummonerSearch({
               if (apiKey) {
                 const client = new RiotApiClient(apiKey, currentRegion);
                 const fullSummonerData = await client.getSummonerByPuuid(summonerData.puuid);
-                console.log('[SummonerSearch] Fetched full summoner data:', fullSummonerData);
+                logger.debug('[SummonerSearch] Fetched full summoner data:', fullSummonerData);
                 // Merge missing fields into summonerData
                 if (fullSummonerData.name) {
                   summonerData.name = fullSummonerData.name;
@@ -158,10 +159,10 @@ export default function SummonerSearch({
                 if (fullSummonerData.id) {
                   summonerData.id = fullSummonerData.id;
                 }
-                console.log('[SummonerSearch] Updated summonerData:', summonerData);
+                logger.debug('[SummonerSearch] Updated summonerData:', summonerData);
               }
             } catch (error) {
-              console.warn('[SummonerSearch] Error fetching summoner name:', error);
+              logger.warn('[SummonerSearch] Error fetching summoner name:', error);
             }
           }
           
@@ -173,7 +174,7 @@ export default function SummonerSearch({
               : new Date(summonerData.lastUpdated),
           };
           
-          console.log('[SummonerSearch] Processed summoner:', summoner);
+          logger.debug('[SummonerSearch] Processed summoner:', summoner);
           
           setCurrentSummoner(summoner);
           
@@ -189,7 +190,7 @@ export default function SummonerSearch({
               }
             }
           } catch (error) {
-            console.error('[SummonerSearch] Failed to fetch league entry:', error);
+            logger.error('[SummonerSearch] Failed to fetch league entry:', error);
             // Don't throw - we can still use the summoner even if league fetch fails
           }
           
@@ -197,9 +198,9 @@ export default function SummonerSearch({
           try {
             const { summonerService } = await import('@/lib/db');
             await summonerService.addOrUpdate(summoner);
-            console.log('[SummonerSearch] Summoner saved to database successfully');
+            logger.debug('[SummonerSearch] Summoner saved to database successfully');
           } catch (error) {
-            console.error('[SummonerSearch] Failed to save summoner to database:', error);
+            logger.error('[SummonerSearch] Failed to save summoner to database:', error);
             // Don't throw - we can still use the summoner even if save fails
           }
           
@@ -239,8 +240,8 @@ export default function SummonerSearch({
         }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '検索に失敗しました';
-      console.error('[SummonerSearch] Search error:', error);
-      console.error('[SummonerSearch] Error message:', errorMessage);
+      logger.error('[SummonerSearch] Search error:', error);
+      logger.error('[SummonerSearch] Error message:', errorMessage);
       setError(errorMessage);
       alert(errorMessage);
     } finally {
@@ -253,11 +254,11 @@ export default function SummonerSearch({
   const fetchAndSaveRateHistory = async (puuid: string, region: string, apiKey: string | null) => {
     try {
       if (!apiKey) {
-        console.warn('[SummonerSearch] API key not available for rate history fetch');
+        logger.warn('[SummonerSearch] API key not available for rate history fetch');
         return;
       }
 
-      console.log('[SummonerSearch] Automatically fetching rate history from match history...');
+      logger.debug('[SummonerSearch] Automatically fetching rate history from match history...');
       const response = await fetch(API_ENDPOINTS.RIOT.FETCH_RATE_HISTORY, {
         method: 'POST',
         headers: {
@@ -274,13 +275,13 @@ export default function SummonerSearch({
       if (!response.ok) {
         const error = await response.json();
         const errorMessage = error.error || 'レート履歴の取得に失敗しました';
-        console.warn('[SummonerSearch] Failed to fetch rate history:', errorMessage);
+        logger.warn('[SummonerSearch] Failed to fetch rate history:', errorMessage);
         return; // Don't throw - just log and continue
       }
 
       const result = await response.json();
-      console.log('[SummonerSearch] Rate history fetched:', result);
-      console.log('[SummonerSearch] Rate history entries:', result.rateHistory?.length || 0);
+      logger.debug('[SummonerSearch] Rate history fetched:', result);
+      logger.debug('[SummonerSearch] Rate history entries:', result.rateHistory?.length || 0);
 
       // Save rate history to database
       if (result.rateHistory && result.rateHistory.length > 0) {
@@ -324,11 +325,11 @@ export default function SummonerSearch({
             }
           } catch (error) {
             failedCount++;
-            console.error('[SummonerSearch] Error saving rate history entry:', error);
+            logger.error('[SummonerSearch] Error saving rate history entry:', error);
           }
         }
         
-        console.log(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed`);
+        logger.info(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed`);
       }
 
       // Update current league entry if not already set
@@ -349,9 +350,9 @@ export default function SummonerSearch({
         });
       }
 
-      console.log(`[SummonerSearch] Rate history fetched and saved: ${result.rateHistory?.length || 0} entries`);
+      logger.info(`[SummonerSearch] Rate history fetched and saved: ${result.rateHistory?.length || 0} entries`);
     } catch (error) {
-      console.warn('[SummonerSearch] Error fetching rate history, but continuing:', error);
+      logger.warn('[SummonerSearch] Error fetching rate history, but continuing:', error);
       // Don't throw - we can still use the summoner even if rate history fetch fails
     }
   };
