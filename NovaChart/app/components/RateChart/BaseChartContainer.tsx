@@ -12,12 +12,18 @@ import {
   ResponsiveContainer,
   Brush,
 } from 'recharts';
-import { CSChartDataResult } from './useCSChartData';
 import { YAxisConfig, YAxisZoom } from './useYAxisConfig';
 import { TimeRange } from './utils/timeRange';
+import { getXAxisInterval } from './utils/getXAxisInterval';
+import { ChartConfig, LineConfig } from './chartConfigs';
+import { ChartDataResult } from './useChartData';
+import { CSChartDataResult } from './useCSChartData';
+import { DamageChartDataResult } from './useDamageChartData';
 
-interface CSChartContainerProps {
-  chartData: CSChartDataResult;
+type ChartData = ChartDataResult | CSChartDataResult | DamageChartDataResult;
+
+interface BaseChartContainerProps {
+  chartData: ChartData;
   yAxisConfig: YAxisConfig;
   movingAverageWindow: number;
   brushStartIndex: number | undefined;
@@ -28,9 +34,10 @@ interface CSChartContainerProps {
   onBrushChange: (startIndex: number, endIndex: number) => void;
   onLegendClick: (dataKey: string) => void;
   onYAxisZoom: (zoomIn: boolean) => void;
+  chartConfig: ChartConfig;
 }
 
-export default function CSChartContainer({
+export default function BaseChartContainer({
   chartData,
   yAxisConfig,
   movingAverageWindow,
@@ -42,28 +49,11 @@ export default function CSChartContainer({
   onBrushChange,
   onLegendClick,
   onYAxisZoom,
-}: CSChartContainerProps) {
-  // Calculate X-axis interval based on timeRange and visible data points
-  const getXAxisInterval = (): number | 'preserveStartEnd' => {
-    const effectiveStartIndex = brushStartIndex ?? chartData.brushStartIndex ?? 0;
-    const effectiveEndIndex = brushEndIndex ?? chartData.brushEndIndex ?? chartData.data.length - 1;
-    const visibleDataPoints = Math.max(1, effectiveEndIndex - effectiveStartIndex + 1);
-    
-    switch (timeRange) {
-      case '1week':
-        return 0;
-      case '1month':
-        return visibleDataPoints > 30 ? 1 : 0;
-      case '1year':
-        return visibleDataPoints > 100 ? 2 : 1;
-      case '5years':
-        return visibleDataPoints > 200 ? 5 : 2;
-      default:
-        return 'preserveStartEnd';
-    }
-  };
+  chartConfig,
+}: BaseChartContainerProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
+  // Handle mouse wheel on chart container
   useEffect(() => {
     const container = chartContainerRef.current;
     if (!container) return;
@@ -84,6 +74,18 @@ export default function CSChartContainer({
     };
   }, [onYAxisZoom]);
 
+  const xAxisInterval = getXAxisInterval(timeRange, chartData, brushStartIndex, brushEndIndex);
+  
+  // Get base lines
+  const baseLines = chartConfig.baseLines(movingAverageWindow, hiddenLines);
+  
+  // Get goal lines if available (only for LP chart)
+  const goalLines = chartConfig.goalLines 
+    ? chartConfig.goalLines(chartData as ChartDataResult, movingAverageWindow, hiddenLines)
+    : [];
+
+  const allLines = [...baseLines, ...goalLines];
+
   return (
     <div ref={chartContainerRef} className="w-full">
       <ResponsiveContainer width="100%" height={600}>
@@ -96,56 +98,44 @@ export default function CSChartContainer({
             angle={-45}
             textAnchor="end"
             height={80}
-            interval={getXAxisInterval()}
+            interval={xAxisInterval}
           />
           <YAxis 
             domain={yAxisConfig.yAxisDomain}
             ticks={yAxisConfig.yAxisTicks}
-            tickFormatter={(value: number) => {
-              if (isNaN(value)) return '';
-              return value.toFixed(1);
-            }}
+            tickFormatter={chartConfig.yAxisFormatter}
             width={90}
-            allowDecimals={true}
-            label={{ value: 'CS/分', angle: -90, position: 'insideLeft' }}
+            allowDecimals={chartConfig.yAxisAllowDecimals}
+            label={chartConfig.yAxisLabel}
           />
           <Tooltip
-            formatter={(value: number, name: string) => {
-              if (isNaN(value)) return 'N/A';
-              if (name.includes('移動平均')) {
-                return value.toFixed(1);
-              }
-              return value.toFixed(1);
-            }}
+            formatter={chartConfig.tooltipFormatter}
             labelFormatter={(label) => `日付: ${label}`}
           />
           <Legend onClick={(e: any) => onLegendClick(e.dataKey)} />
-          <Line
-            type="monotone"
-            dataKey="csPerMin"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            name="CS/分"
-            dot={{ r: 4 }}
-            connectNulls={true}
-            hide={hiddenLines.has('csPerMin')}
-          />
-          <Line
-            type="monotone"
-            dataKey="movingAverage"
-            stroke="#10b981"
-            strokeWidth={2}
-            strokeDasharray="5 5"
-            name={`移動平均 (${movingAverageWindow}試合)`}
-            dot={false}
-            connectNulls={true}
-            hide={hiddenLines.has('movingAverage')}
-          />
+          {allLines.map((lineConfig: LineConfig, index: number) => (
+            <Line
+              key={lineConfig.dataKey || index}
+              type={lineConfig.type || 'monotone'}
+              dataKey={lineConfig.dataKey}
+              stroke={lineConfig.stroke}
+              strokeWidth={lineConfig.strokeWidth}
+              strokeDasharray={lineConfig.strokeDasharray}
+              name={typeof lineConfig.name === 'function' 
+                ? lineConfig.name(movingAverageWindow) 
+                : lineConfig.name}
+              dot={lineConfig.dot}
+              activeDot={lineConfig.activeDot}
+              connectNulls={lineConfig.connectNulls}
+              isAnimationActive={lineConfig.isAnimationActive}
+              hide={lineConfig.hide}
+            />
+          ))}
           <Brush
             dataKey="date"
             height={30}
-            stroke="#3b82f6"
-            fill="#3b82f6"
+            stroke={chartConfig.brushColor}
+            fill={chartConfig.brushFillColor}
             fillOpacity={0.3}
             strokeWidth={2}
             travellerWidth={12}
@@ -164,8 +154,8 @@ export default function CSChartContainer({
                   y={y}
                   width={width}
                   height={height}
-                  fill="#1e40af"
-                  stroke="#1e3a8a"
+                  fill={chartConfig.brushTravellerFill}
+                  stroke={chartConfig.brushTravellerStroke}
                   strokeWidth={2}
                   rx={2}
                 />
