@@ -23,7 +23,7 @@ export default function ChartControls({
 }: ChartControlsProps) {
   return (
     <div className="flex justify-between items-center mb-4">
-      <h2 className="text-2xl font-bold">レート推移</h2>
+      <h2 className="text-2xl font-bold"></h2>
       <div className="flex gap-2">
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-700 dark:text-gray-300">移動平均:</label>
