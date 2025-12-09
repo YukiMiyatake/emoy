@@ -18,30 +18,6 @@ export interface CSChartDataResult {
   brushEndIndex: number | undefined;
 }
 
-function filterByTimeRange(matches: Match[], timeRange: TimeRange): Match[] {
-  const now = new Date();
-  let cutoffDate: Date;
-
-  switch (timeRange) {
-    case '1week':
-      cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case '1month':
-      cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case '1year':
-      cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      break;
-    case '5years':
-      cutoffDate = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000);
-      break;
-    default:
-      return matches;
-  }
-
-  return matches.filter(m => new Date(m.date) >= cutoffDate);
-}
-
 function calculateMovingAverage(data: number[], window: number): number[] {
   if (data.length === 0) return [];
   
@@ -61,9 +37,9 @@ export function useCSChartData(
   movingAverageWindow: number
 ): CSChartDataResult {
   return useMemo(() => {
-    const filteredMatches = filterByTimeRange(matches, timeRange);
-    
-    if (filteredMatches.length === 0) {
+    // Use ALL data (same as LP chart) - don't filter by timeRange here
+    // Filtering is handled by Brush initialization
+    if (matches.length === 0) {
       return {
         data: [],
         yAxisDomain: [0, 10],
@@ -73,8 +49,8 @@ export function useCSChartData(
       };
     }
 
-    // 日付順にソート
-    const sorted = [...filteredMatches].sort(
+    // 日付順にソート（全データを使用）
+    const sorted = [...matches].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -125,16 +101,56 @@ export function useCSChartData(
       ticks.push(Math.round((minValue + tickStep * i) * 10) / 10);
     }
 
-    // Brushの初期範囲（全体の80%）
-    const brushStart = Math.floor(dataPoints.length * 0.1);
-    const brushEnd = Math.floor(dataPoints.length * 0.9);
+    // Calculate brush start/end indices based on timeRange (same logic as LP chart)
+    let brushStart: number | undefined = undefined;
+    let brushEnd: number | undefined = undefined;
+    
+    if (timeRange !== 'all' && dataPoints.length > 0) {
+      const now = new Date().getTime();
+      let targetStartDate: number;
+      
+      switch (timeRange) {
+        case '5years':
+          targetStartDate = new Date(now).setFullYear(new Date(now).getFullYear() - 5);
+          break;
+        case '1year':
+          targetStartDate = new Date(now).setFullYear(new Date(now).getFullYear() - 1);
+          break;
+        case '1month':
+          targetStartDate = new Date(now).setMonth(new Date(now).getMonth() - 1);
+          break;
+        case '1week':
+          targetStartDate = now - 7 * 24 * 60 * 60 * 1000;
+          break;
+        default:
+          targetStartDate = now;
+      }
+      
+      let startIdx = dataPoints.findIndex(d => d.dateValue >= targetStartDate);
+      if (startIdx === -1) {
+        startIdx = 0;
+      }
+      
+      brushStart = startIdx;
+      brushEnd = dataPoints.length - 1;
+      
+      if (brushEnd - brushStart < 2 && dataPoints.length > 0) {
+        const minVisiblePoints = Math.max(2, Math.floor(dataPoints.length * 0.1));
+        brushStart = Math.max(0, dataPoints.length - minVisiblePoints);
+        brushEnd = dataPoints.length - 1;
+      }
+    } else if (dataPoints.length > 10) {
+      // For 'all' timeRange, use 80% of data
+      brushStart = Math.floor(dataPoints.length * 0.1);
+      brushEnd = Math.floor(dataPoints.length * 0.9);
+    }
 
     return {
       data: dataPoints,
       yAxisDomain: [minValue, maxValue],
       yAxisTicks: ticks,
-      brushStartIndex: dataPoints.length > 10 ? brushStart : undefined,
-      brushEndIndex: dataPoints.length > 10 ? brushEnd : undefined,
+      brushStartIndex: brushStart,
+      brushEndIndex: brushEnd,
     };
   }, [matches, timeRange, movingAverageWindow]);
 }

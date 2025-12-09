@@ -129,7 +129,14 @@ export default function RateChart() {
 
   // Handle Y-axis zoom
   const handleYAxisZoom = useCallback((zoomIn: boolean) => {
-    if (!yAxisConfig.yAxisDomain || !Array.isArray(yAxisConfig.yAxisDomain)) return;
+    const currentDomain =
+      chartType === 'lp'
+        ? yAxisConfig.yAxisDomain
+        : chartType === 'cs'
+        ? csYAxisConfig.yAxisDomain
+        : damageYAxisConfig.yAxisDomain;
+
+    if (!currentDomain || !Array.isArray(currentDomain)) return;
     
     let currentMin: number;
     let currentMax: number;
@@ -137,7 +144,7 @@ export default function RateChart() {
       currentMin = yAxisZoom.min;
       currentMax = yAxisZoom.max;
     } else {
-      [currentMin, currentMax] = yAxisConfig.yAxisDomain;
+      [currentMin, currentMax] = currentDomain;
     }
     
     const currentRange = currentMax - currentMin;
@@ -151,15 +158,27 @@ export default function RateChart() {
       newRange = currentRange * (1 + zoomFactor);
     }
     
-    const minRange = 50;
-    const maxRange = 5000;
+    // グラフタイプごとに適切なズーム幅を設定
+    const minRange =
+      chartType === 'lp'
+        ? 50
+        : chartType === 'cs'
+        ? 0.5
+        : 50; // damage
+
+    const maxRange =
+      chartType === 'lp'
+        ? 5000
+        : chartType === 'cs'
+        ? 100
+        : 5000;
     newRange = Math.max(minRange, Math.min(maxRange, newRange));
     
     const newMin = Math.max(0, center - newRange / 2);
     const newMax = center + newRange / 2;
     
     setYAxisZoom({ min: newMin, max: newMax });
-  }, [yAxisConfig.yAxisDomain, yAxisZoom]);
+  }, [chartType, yAxisConfig.yAxisDomain, csYAxisConfig.yAxisDomain, damageYAxisConfig.yAxisDomain, yAxisZoom]);
 
   // Handle keyboard events for numpad +/-
   useEffect(() => {

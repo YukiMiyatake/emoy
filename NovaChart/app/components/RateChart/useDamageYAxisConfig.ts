@@ -59,19 +59,76 @@ export function useDamageYAxisConfig(
       ? [Math.max(0, yAxisZoom.min), yAxisZoom.max] as [number, number]
       : baseYAxisDomain;
 
-    // Generate Y-axis ticks
-    const [domainMin, domainMax] = yAxisDomain;
-    const domainRange = domainMax - domainMin;
-    const tickCount = 6;
-    const tickStep = domainRange / (tickCount - 1);
-    const ticks: number[] = [];
-    for (let i = 0; i < tickCount; i++) {
-      ticks.push(Math.round(domainMin + tickStep * i));
-    }
+    // Generate Y-axis ticks based on domain range
+    const generateYTicks = () => {
+      const tickSet = new Set<number>();
+      const [domainMin, domainMax] = yAxisDomain;
+      const domainRange = domainMax - domainMin;
+
+      // Determine appropriate tick interval based on range
+      let tickInterval: number;
+      if (domainRange <= 200) {
+        tickInterval = 25;
+      } else if (domainRange <= 500) {
+        tickInterval = 50;
+      } else if (domainRange <= 1000) {
+        tickInterval = 100;
+      } else if (domainRange <= 2000) {
+        tickInterval = 200;
+      } else {
+        tickInterval = 500;
+      }
+
+      // Generate ticks starting from the first interval at or below domainMin
+      // and ending at the first interval at or above domainMax
+      let startTick = Math.floor(domainMin / tickInterval) * tickInterval;
+      let endTick = Math.ceil(domainMax / tickInterval) * tickInterval;
+      
+      // Ensure we have at least one tick below domainMin and one above domainMax
+      if (startTick >= domainMin) {
+        startTick -= tickInterval;
+      }
+      if (endTick <= domainMax) {
+        endTick += tickInterval;
+      }
+      
+      let currentTick = startTick;
+      while (currentTick <= endTick) {
+        const roundedTick = Math.round(currentTick);
+        // Only add ticks that are within or near the domain
+        if (roundedTick >= domainMin - tickInterval && roundedTick <= domainMax + tickInterval) {
+          tickSet.add(roundedTick);
+        }
+        currentTick += tickInterval;
+      }
+
+      // Always include domain boundaries
+      const roundedMin = Math.round(domainMin);
+      const roundedMax = Math.round(domainMax);
+      tickSet.add(roundedMin);
+      tickSet.add(roundedMax);
+
+      // Convert Set to sorted array
+      const ticks = Array.from(tickSet).sort((a, b) => a - b);
+
+      // Ensure at least 3 ticks
+      if (ticks.length < 3) {
+        const midPoint = (domainMin + domainMax) / 2;
+        const midTick = Math.round(Math.round(midPoint / tickInterval) * tickInterval);
+        if (!tickSet.has(midTick)) {
+          ticks.push(midTick);
+          ticks.sort((a, b) => a - b);
+        }
+      }
+
+      return ticks;
+    };
+
+    const yAxisTicks = generateYTicks();
 
     return {
       yAxisDomain,
-      yAxisTicks: ticks,
+      yAxisTicks,
     };
   }, [
     chartData.data,
