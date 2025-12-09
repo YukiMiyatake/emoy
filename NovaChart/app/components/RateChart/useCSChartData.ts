@@ -131,9 +131,28 @@ export function useCSChartData(
         startIdx = 0;
       }
       
-      brushStart = startIdx;
-      brushEnd = dataPoints.length - 1;
+      // 今日の日付を取得（時刻を0時にリセット）
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayTime = today.getTime();
       
+      // 今日に最も近いデータポイントのインデックスを見つける
+      let todayIdx = dataPoints.length - 1;
+      for (let i = dataPoints.length - 1; i >= 0; i--) {
+        if (dataPoints[i].dateValue <= todayTime) {
+          todayIdx = i;
+          break;
+        }
+      }
+      
+      // 今日が右端の90%の位置に来るように調整
+      const targetTodayPosition = 0.9; // 90%の位置
+      const totalVisiblePoints = Math.max(10, Math.floor((todayIdx - startIdx) / targetTodayPosition));
+      
+      brushStart = Math.max(startIdx, todayIdx - totalVisiblePoints + 1);
+      brushEnd = Math.min(dataPoints.length - 1, todayIdx + Math.floor(totalVisiblePoints * 0.1));
+      
+      // 最小表示ポイント数を確保
       if (brushEnd - brushStart < 2 && dataPoints.length > 0) {
         const minVisiblePoints = Math.max(2, Math.floor(dataPoints.length * 0.1));
         brushStart = Math.max(0, dataPoints.length - minVisiblePoints);

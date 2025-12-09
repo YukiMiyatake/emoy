@@ -15,6 +15,7 @@ import {
 import { lpToTierRank } from '@/lib/riot/client';
 import { ChartDataResult } from './useChartData';
 import { YAxisConfig, YAxisZoom } from './useYAxisConfig';
+import { TimeRange } from './utils/timeRange';
 
 interface ChartContainerProps {
   chartData: ChartDataResult;
@@ -24,6 +25,7 @@ interface ChartContainerProps {
   brushEndIndex: number | undefined;
   hiddenLines: Set<string>;
   yAxisZoom: YAxisZoom | null;
+  timeRange: TimeRange;
   onBrushChange: (startIndex: number, endIndex: number) => void;
   onLegendClick: (dataKey: string) => void;
   onYAxisZoom: (zoomIn: boolean) => void;
@@ -37,10 +39,35 @@ export default function ChartContainer({
   brushEndIndex,
   hiddenLines,
   yAxisZoom,
+  timeRange,
   onBrushChange,
   onLegendClick,
   onYAxisZoom,
 }: ChartContainerProps) {
+  // Calculate X-axis interval based on timeRange and visible data points
+  const getXAxisInterval = (): number | 'preserveStartEnd' => {
+    const effectiveStartIndex = brushStartIndex ?? chartData.brushStartIndex ?? 0;
+    const effectiveEndIndex = brushEndIndex ?? chartData.brushEndIndex ?? chartData.data.length - 1;
+    const visibleDataPoints = Math.max(1, effectiveEndIndex - effectiveStartIndex + 1);
+    
+    switch (timeRange) {
+      case '1week':
+        // 1週間: すべて表示（interval=0）
+        return 0;
+      case '1month':
+        // 1か月: データポイント数に応じて調整（最大30日分なので、interval=0または1）
+        return visibleDataPoints > 30 ? 1 : 0;
+      case '1year':
+        // 1年: 2-3日おき
+        return visibleDataPoints > 100 ? 2 : 1;
+      case '5years':
+        // 5年: 週ごと程度
+        return visibleDataPoints > 200 ? 5 : 2;
+      default:
+        // all: 自動
+        return 'preserveStartEnd';
+    }
+  };
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle mouse wheel on chart container
@@ -77,6 +104,7 @@ export default function ChartContainer({
             angle={-45}
             textAnchor="end"
             height={80}
+            interval={getXAxisInterval()}
           />
           <YAxis 
             domain={yAxisConfig.yAxisDomain}
