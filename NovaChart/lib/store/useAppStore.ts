@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import { RateHistory, Goal, Match, Summoner, LeagueEntry } from '@/types';
 import { rateHistoryService, goalService, matchService, summonerService } from '@/lib/db';
+import { logger } from '@/lib/utils/logger';
+
+type StoreError = unknown;
+
+function handleStoreError(
+  set: (partial: Partial<AppState>) => void,
+  error: StoreError,
+  defaultMessage: string
+) {
+  const message = error instanceof Error ? error.message : defaultMessage;
+  logger.error('[useAppStore] Error:', error);
+  set({ error: message, isLoading: false });
+}
 
 interface AppState {
   rateHistory: RateHistory[];
@@ -27,6 +40,29 @@ interface AppState {
   setLoading: (loading: boolean) => void;
 }
 
+// Selectors
+export function useSoloQueueStats() {
+  return useAppStore((state) => {
+    const entry = state.currentLeagueEntry;
+    if (!entry) return null;
+    const totalGames = entry.wins + entry.losses;
+    const winRate = totalGames > 0 ? Math.round((entry.wins / totalGames) * 100) : 0;
+    return {
+      queueType: entry.queueType,
+      wins: entry.wins,
+      losses: entry.losses,
+      winRate,
+      tier: entry.tier,
+      rank: entry.rank,
+      leaguePoints: entry.leaguePoints,
+    };
+  });
+}
+
+export function useActiveGoals() {
+  return useAppStore((state) => state.goals.filter((g) => g.isActive));
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   rateHistory: [],
   goals: [],
@@ -42,10 +78,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const history = await rateHistoryService.getAll();
       set({ rateHistory: history, isLoading: false });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load rate history',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to load rate history');
     }
   },
 
@@ -56,10 +89,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await rateHistoryService.add(rate);
       await get().loadRateHistory();
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to add rate history',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to add rate history');
     }
   },
 
@@ -69,10 +99,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await rateHistoryService.deleteAll();
       await get().loadRateHistory();
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to clear rate history',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to clear rate history');
     }
   },
 
@@ -82,10 +109,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const goals = await goalService.getAll();
       set({ goals, isLoading: false });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load goals',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to load goals');
     }
   },
 
@@ -95,10 +119,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await goalService.add(goal);
       await get().loadGoals();
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to add goal',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to add goal');
     }
   },
 
@@ -108,10 +129,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await goalService.update(id, changes);
       await get().loadGoals();
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to update goal',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to update goal');
     }
   },
 
@@ -121,10 +139,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await goalService.delete(id);
       await get().loadGoals();
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to delete goal',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to delete goal');
     }
   },
 
@@ -134,10 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const matches = await matchService.getAll();
       set({ matches, isLoading: false });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load matches',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to load matches');
     }
   },
 
@@ -147,10 +159,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await matchService.add(match);
       await get().loadMatches();
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to add match',
-        isLoading: false,
-      });
+      handleStoreError(set, error, 'Failed to add match');
     }
   },
 
