@@ -26,15 +26,22 @@ export const API_ENDPOINTS = {
 } as const;
 
 // Default values
+// ⚠️ CRITICAL: QUEUE_TYPE must ALWAYS be RANKED_SOLO_5x5 (solo queue)
+// This mistake has been made multiple times. DO NOT change this to any other queue type.
+// NovaChart ONLY supports solo queue data. Flex queue and other queue types are NOT supported.
 export const DEFAULTS = {
   REGION: 'jp1',
-  QUEUE_TYPE: 'RANKED_SOLO_5x5',
+  QUEUE_TYPE: 'RANKED_SOLO_5x5', // ⚠️ MUST be solo queue - DO NOT change
 } as const;
 
 // Queue types
+// ⚠️ CRITICAL: NovaChart ONLY supports RANKED_SOLO_5x5 (solo queue)
+// RANKED_FLEX_SR (flex queue) is listed here for reference only.
+// DO NOT use RANKED_FLEX_SR or any other queue type in NovaChart.
+// This mistake has been made multiple times. Only use RANKED_SOLO_5x5.
 export const QUEUE_TYPES = {
-  RANKED_SOLO_5x5: 'RANKED_SOLO_5x5',
-  RANKED_FLEX_SR: 'RANKED_FLEX_SR',
+  RANKED_SOLO_5x5: 'RANKED_SOLO_5x5', // ✅ Use this - solo queue only
+  RANKED_FLEX_SR: 'RANKED_FLEX_SR', // ❌ DO NOT use - flex queue is not supported
 } as const;
 
 // Error messages

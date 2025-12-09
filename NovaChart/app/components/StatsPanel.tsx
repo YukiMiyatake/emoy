@@ -4,9 +4,33 @@ import { useEffect } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { calculateStatistics, calculateProgress, calculateRequiredMatches } from '@/lib/analytics/progress';
 
+/**
+ * StatsPanel Component
+ * 
+ * ⚠️ CRITICAL: This component ONLY displays statistics for RANKED_SOLO_5x5 (solo queue) data.
+ * This mistake has been made multiple times. DO NOT display statistics for other queue types.
+ * 
+ * Rules:
+ * - If currentLeagueEntry exists, it MUST be RANKED_SOLO_5x5
+ * - If currentLeagueEntry is not solo queue, show a message instead of statistics
+ * - DO NOT calculate or display statistics for flex queue or any other queue type
+ */
 export default function StatsPanel() {
   const { rateHistory, goals, matches, currentLeagueEntry } = useAppStore();
 
+  // ⚠️ CRITICAL: Only use solo queue (RANKED_SOLO_5x5) data
+  // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+  // If currentLeagueEntry exists, it must be solo queue. Otherwise, reject it.
+  if (currentLeagueEntry && currentLeagueEntry.queueType !== 'RANKED_SOLO_5x5') {
+    // DO NOT display statistics for non-solo queue data
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 className="text-2xl font-bold mb-4">統計情報</h2>
+        <p className="text-gray-500">ソロランクのデータのみ表示されます</p>
+      </div>
+    );
+  }
+  
   // Filter rateHistory to only include solo queue (RANKED_SOLO_5x5) data
   // Since RateHistory doesn't have queueType, we'll use currentLeagueEntry for current stats
   // and filter rateHistory based on the assumption that it's mostly solo queue data

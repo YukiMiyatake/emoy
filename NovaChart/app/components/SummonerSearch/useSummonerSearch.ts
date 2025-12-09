@@ -100,12 +100,15 @@ export function useSummonerSearch(
         logger.info(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed`);
       }
 
-      // Update current league entry if not already set
+      // ⚠️ CRITICAL: Update current league entry if not already set
+      // Note: fetch-rate-history API already returns only solo queue data,
+      // but we explicitly set queueType to DEFAULTS.QUEUE_TYPE (RANKED_SOLO_5x5) for safety.
+      // setCurrentLeagueEntry will also validate that it's solo queue.
       const currentState = useAppStore.getState();
       if (result.currentEntry && !currentState.currentLeagueEntry) {
         setCurrentLeagueEntry({
           leagueId: '',
-          queueType: DEFAULTS.QUEUE_TYPE,
+          queueType: DEFAULTS.QUEUE_TYPE, // Explicitly set to RANKED_SOLO_5x5
           tier: result.currentEntry.tier,
           rank: result.currentEntry.rank,
           leaguePoints: result.currentEntry.lp,
@@ -218,14 +221,26 @@ export function useSummonerSearch(
         
         setCurrentSummoner(summoner);
         
-        // Fetch league entry to display current rank
+        // ⚠️ CRITICAL: Fetch league entry to display current rank (solo queue only)
+        // This mistake has been made multiple times. DO NOT forget to:
+        // 1. Specify queueType=RANKED_SOLO_5x5 in the API call
+        // 2. Check that the returned entry is solo queue before setting it
         try {
-          const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
+          // ⚠️ MUST specify queueType parameter explicitly - DO NOT rely on defaults
+          const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}&queueType=${DEFAULTS.QUEUE_TYPE}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
           if (leagueResponse.ok) {
             const leagueData = await leagueResponse.json();
             if (leagueData.entry) {
               const entry = extractLeagueEntry(leagueData.entry);
-              setCurrentLeagueEntry(entry);
+              // ⚠️ CRITICAL: Only set if it's solo queue (RANKED_SOLO_5x5)
+              // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+              // DO NOT set flex queue or any other queue type entry.
+              if (entry.queueType === 'RANKED_SOLO_5x5') {
+                setCurrentLeagueEntry(entry);
+              } else {
+                logger.warn('[SummonerSearch] Received non-solo queue entry, ignoring:', entry.queueType);
+                // DO NOT set the entry - reject it
+              }
             }
           }
         } catch (error) {

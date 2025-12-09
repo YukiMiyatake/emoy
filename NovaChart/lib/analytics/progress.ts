@@ -1,3 +1,16 @@
+/**
+ * Analytics and Progress Calculation
+ * 
+ * ⚠️ CRITICAL: This module ONLY processes RANKED_SOLO_5x5 (solo queue) data.
+ * 
+ * IMPORTANT: Before modifying this file, read:
+ * - docs/development/solo-queue-only-guidelines.md
+ * 
+ * This mistake has been made multiple times. DO NOT accept any other queue types.
+ * All statistics, progress calculations, and required matches calculations
+ * MUST only use solo queue data.
+ */
+
 import { RateHistory, Goal, Match } from '@/types';
 import { tierRankToLP, lpToTierRank } from '@/lib/riot/client';
 
@@ -243,6 +256,9 @@ export function calculateProgress(
 
 /**
  * Calculate required matches to reach goal based on win rate and play frequency
+ * 
+ * ⚠️ CRITICAL: This function ONLY accepts RANKED_SOLO_5x5 (solo queue) data.
+ * This mistake has been made multiple times. DO NOT accept any other queue types.
  */
 export function calculateRequiredMatches(
   rateHistory: RateHistory[],
@@ -255,11 +271,16 @@ export function calculateRequiredMatches(
     return null;
   }
 
-  // Use currentLeagueEntry for current LP if available and it's solo queue
-  const isSoloQueue = !currentLeagueEntry || currentLeagueEntry.queueType === 'RANKED_SOLO_5x5';
+  // ⚠️ CRITICAL: Only calculate for solo queue (RANKED_SOLO_5x5)
+  // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+  // If currentLeagueEntry exists, it must be solo queue. Otherwise, reject it.
+  if (currentLeagueEntry && currentLeagueEntry.queueType !== 'RANKED_SOLO_5x5') {
+    // DO NOT process flex queue or any other queue type data
+    return null;
+  }
   
   let currentLP: number;
-  if (isSoloQueue && currentLeagueEntry && currentLeagueEntry.tier && currentLeagueEntry.rank !== undefined && currentLeagueEntry.leaguePoints !== undefined) {
+  if (currentLeagueEntry && currentLeagueEntry.tier && currentLeagueEntry.rank !== undefined && currentLeagueEntry.leaguePoints !== undefined) {
     currentLP = tierRankToLP(currentLeagueEntry.tier, currentLeagueEntry.rank, currentLeagueEntry.leaguePoints);
   } else if (rateHistory.length > 0) {
     const latest = rateHistory[rateHistory.length - 1];
@@ -283,7 +304,7 @@ export function calculateRequiredMatches(
   // Calculate win rate with time-weighted average (more recent data has higher weight)
   let winRate = 0.5; // Default 50%
   
-  if (isSoloQueue && currentLeagueEntry && currentLeagueEntry.wins !== undefined && currentLeagueEntry.losses !== undefined) {
+  if (currentLeagueEntry && currentLeagueEntry.wins !== undefined && currentLeagueEntry.losses !== undefined) {
     // Use currentLeagueEntry if available, but also consider recent rate history for better accuracy
     const totalGames = currentLeagueEntry.wins + currentLeagueEntry.losses;
     if (totalGames > 0 && rateHistory.length === 0) {
@@ -325,6 +346,15 @@ export function calculateRequiredMatches(
 
 /**
  * Calculate statistics from rate history
+ * 
+ * ⚠️ CRITICAL: This function ONLY accepts RANKED_SOLO_5x5 (solo queue) data.
+ * This mistake has been made multiple times. DO NOT accept any other queue types.
+ * 
+ * Rules:
+ * - If currentLeagueEntry exists, it MUST be RANKED_SOLO_5x5
+ * - If currentLeagueEntry is not solo queue, return null immediately
+ * - DO NOT use conditions like: !currentLeagueEntry || currentLeagueEntry.queueType === 'RANKED_SOLO_5x5'
+ *   (This would return true when currentLeagueEntry is null, which is wrong)
  */
 export interface RateStatistics {
   totalGames: number;
@@ -342,11 +372,12 @@ export interface RateStatistics {
 }
 
 export function calculateStatistics(rateHistory: RateHistory[], currentLeagueEntry?: { queueType?: string; wins?: number; losses?: number; tier?: string; rank?: string; leaguePoints?: number } | null | undefined): RateStatistics | null {
-  // Only calculate statistics for solo queue
-  const isSoloQueue = !currentLeagueEntry || currentLeagueEntry.queueType === 'RANKED_SOLO_5x5';
-  
-  if (!isSoloQueue) {
-    // If currentLeagueEntry is not solo queue, return null
+  // ⚠️ CRITICAL: Only calculate statistics for solo queue (RANKED_SOLO_5x5)
+  // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+  // If currentLeagueEntry exists, it must be solo queue. Otherwise, reject it.
+  if (currentLeagueEntry && currentLeagueEntry.queueType !== 'RANKED_SOLO_5x5') {
+    // If currentLeagueEntry is not solo queue, return null immediately
+    // DO NOT process flex queue or any other queue type data
     return null;
   }
 
@@ -381,13 +412,13 @@ export function calculateStatistics(rateHistory: RateHistory[], currentLeagueEnt
     return null;
   }
 
-  // Use currentLeagueEntry for current tier/rank/LP if available
+  // Use currentLeagueEntry for current tier/rank/LP if available (must be solo queue)
   let currentTier: string;
   let currentRank: string;
   let currentLP: number;
   let currentLPTotal: number;
   
-  if (isSoloQueue && currentLeagueEntry && currentLeagueEntry.tier && currentLeagueEntry.rank !== undefined && currentLeagueEntry.leaguePoints !== undefined) {
+  if (currentLeagueEntry && currentLeagueEntry.tier && currentLeagueEntry.rank !== undefined && currentLeagueEntry.leaguePoints !== undefined) {
     currentTier = currentLeagueEntry.tier;
     currentRank = currentLeagueEntry.rank;
     currentLP = currentLeagueEntry.leaguePoints;

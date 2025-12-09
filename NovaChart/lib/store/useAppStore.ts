@@ -1,3 +1,15 @@
+/**
+ * Application Store (Zustand)
+ * 
+ * ⚠️ CRITICAL: This store ONLY accepts RANKED_SOLO_5x5 (solo queue) league entries.
+ * 
+ * IMPORTANT: Before modifying this file, read:
+ * - docs/development/solo-queue-only-guidelines.md
+ * 
+ * The setCurrentLeagueEntry function validates that entries are solo queue.
+ * This mistake has been made multiple times. DO NOT remove the validation.
+ */
+
 import { create } from 'zustand';
 import { RateHistory, Goal, Match, Summoner, LeagueEntry } from '@/types';
 import { rateHistoryService, goalService, matchService, summonerService } from '@/lib/db';
@@ -168,6 +180,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setCurrentLeagueEntry: (entry) => {
+    // ⚠️ CRITICAL: Only allow solo queue (RANKED_SOLO_5x5) entries
+    // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+    // Non-solo queue entries (like RANKED_FLEX_SR) must be rejected.
+    // This prevents statistics from including flex queue data.
+    if (entry && entry.queueType !== 'RANKED_SOLO_5x5') {
+      logger.warn('[useAppStore] Attempted to set non-solo queue entry, ignoring:', entry.queueType);
+      // DO NOT set the entry - reject it immediately
+      return;
+    }
     set({ currentLeagueEntry: entry });
   },
 

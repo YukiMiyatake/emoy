@@ -113,14 +113,26 @@ export default function Home() {
         logger.warn('[Update] Failed to update summoner info:', error);
       }
 
-      // 2. Update league entry
+      // ⚠️ CRITICAL: Update league entry (solo queue only)
+      // This mistake has been made multiple times. DO NOT forget to:
+      // 1. Specify queueType=RANKED_SOLO_5x5 in the API call
+      // 2. Check that the returned entry is solo queue before setting it
       try {
-        const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&apiKey=${encodeURIComponent(apiKey)}`);
+        // ⚠️ MUST specify queueType parameter explicitly - DO NOT rely on defaults
+        const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&queueType=${DEFAULTS.QUEUE_TYPE}&apiKey=${encodeURIComponent(apiKey)}`);
         if (leagueResponse.ok) {
           const leagueData = await leagueResponse.json();
           if (leagueData.entry) {
             const entry = extractLeagueEntry(leagueData.entry);
-            setCurrentLeagueEntry(entry);
+            // ⚠️ CRITICAL: Only set if it's solo queue (RANKED_SOLO_5x5)
+            // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+            // DO NOT set flex queue or any other queue type entry.
+            if (entry.queueType === 'RANKED_SOLO_5x5') {
+              setCurrentLeagueEntry(entry);
+            } else {
+              logger.warn('[Update] Received non-solo queue entry, ignoring:', entry.queueType);
+              // DO NOT set the entry - reject it
+            }
           }
         }
       } catch (error) {
@@ -169,11 +181,14 @@ export default function Home() {
             logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed`);
           }
 
-          // Update league entry if available
+          // ⚠️ CRITICAL: Update league entry if available
+          // Note: fetch-rate-history API already returns only solo queue data,
+          // but we explicitly set queueType to 'RANKED_SOLO_5x5' for safety.
+          // setCurrentLeagueEntry will also validate that it's solo queue.
           if (result.currentEntry) {
             const entry: LeagueEntry = {
               leagueId: '',
-              queueType: 'RANKED_SOLO_5x5',
+              queueType: 'RANKED_SOLO_5x5', // Explicitly set to solo queue
               tier: result.currentEntry.tier,
               rank: result.currentEntry.rank,
               leaguePoints: result.currentEntry.lp,
@@ -184,7 +199,7 @@ export default function Home() {
               freshBlood: false,
               hotStreak: false,
             };
-            setCurrentLeagueEntry(entry);
+            setCurrentLeagueEntry(entry); // This will validate it's solo queue
           }
         }
       } catch (error) {

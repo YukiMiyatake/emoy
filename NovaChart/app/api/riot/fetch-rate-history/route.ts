@@ -4,6 +4,14 @@ import { RiotApiClient, tierRankToLP, lpToTierRank } from '@/lib/riot/client';
 /**
  * Fetch rate history from match history
  * This endpoint fetches match history and attempts to calculate rate changes
+ * 
+ * ⚠️ CRITICAL: This endpoint ONLY returns RANKED_SOLO_5x5 (solo queue) data.
+ * This mistake has been made multiple times. DO NOT return any other queue types.
+ * 
+ * Rules:
+ * - Only fetch solo queue league entry using getRankedSoloQueueEntryByPuuid
+ * - DO NOT fetch flex queue or any other queue type data
+ * - Returned currentEntry is guaranteed to be solo queue
  */
 export async function POST(request: NextRequest) {
   const { puuid, region = 'jp1', apiKey: apiKeyFromRequest, maxMatches = 100 } = await request.json();
@@ -27,7 +35,10 @@ export async function POST(request: NextRequest) {
   try {
     const client = new RiotApiClient(apiKey, region);
 
-    // Get current league entry
+    // ⚠️ CRITICAL: Get current league entry - ONLY solo queue (RANKED_SOLO_5x5)
+    // This mistake has been made multiple times. DO NOT use getLeagueEntriesByPuuid
+    // or any method that might return flex queue data.
+    // MUST use getRankedSoloQueueEntryByPuuid to ensure only solo queue data.
     const currentEntry = await client.getRankedSoloQueueEntryByPuuid(puuid);
     if (!currentEntry) {
       return NextResponse.json(
