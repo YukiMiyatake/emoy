@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { RateHistory, Goal, Match, Summoner, LeagueEntry } from '@/types';
+import { RateHistory, Goal, Match, Summoner, LeagueEntry, SkillGoal } from '@/types';
 
 export class NovaChartDB extends Dexie {
   rateHistory!: Table<RateHistory, number>;
@@ -7,6 +7,7 @@ export class NovaChartDB extends Dexie {
   matches!: Table<Match, number>;
   summoners!: Table<Summoner, string>;
   leagueEntries!: Table<LeagueEntry & { puuid: string; lastUpdated: Date }, string>; // puuid as primary key
+  skillGoals!: Table<SkillGoal, number>;
 
   constructor() {
     // Use a new database name to avoid primary key migration issues
@@ -29,6 +30,16 @@ export class NovaChartDB extends Dexie {
       matches: '++id, date, win, role, champion',
       summoners: '&puuid, id, name, region, lastUpdated',
       leagueEntries: '&puuid, queueType, lastUpdated', // &puuid = unique primary key, only solo queue entries
+    });
+
+    // Version 3: Add skillGoals table
+    this.version(3).stores({
+      rateHistory: '++id, date, tier, rank, lp',
+      goals: '++id, targetDate, createdAt, isActive',
+      matches: '++id, date, win, role, champion',
+      summoners: '&puuid, id, name, region, lastUpdated',
+      leagueEntries: '&puuid, queueType, lastUpdated',
+      skillGoals: '++id, type, lane, createdAt, isActive',
     });
   }
 }
@@ -243,4 +254,43 @@ export const leagueEntryService = {
     return await db.leagueEntries.clear();
   },
 };
+
+export const skillGoalService = {
+  async getAll(): Promise<SkillGoal[]> {
+    return await db.skillGoals.orderBy('createdAt').reverse().toArray();
+  },
+
+  async getActive(): Promise<SkillGoal[]> {
+    return await db.skillGoals.where('isActive').equals(true).toArray();
+  },
+
+  async getByType(type: SkillGoal['type']): Promise<SkillGoal[]> {
+    return await db.skillGoals.where('type').equals(type).toArray();
+  },
+
+  async add(goal: Omit<SkillGoal, 'id'>): Promise<number> {
+    return await db.skillGoals.add(goal as SkillGoal);
+  },
+
+  async update(id: number, changes: Partial<SkillGoal>): Promise<number> {
+    return await db.skillGoals.update(id, changes);
+  },
+
+  async delete(id: number): Promise<void> {
+    return await db.skillGoals.delete(id);
+  },
+
+  async deleteAll(): Promise<void> {
+    return await db.skillGoals.clear();
+  },
+};
+
+export async function clearAllData(): Promise<void> {
+  await rateHistoryService.deleteAll();
+  await goalService.deleteAll();
+  await matchService.deleteAll();
+  await summonerService.deleteAll();
+  await leagueEntryService.deleteAll();
+  await skillGoalService.deleteAll();
+}
 
