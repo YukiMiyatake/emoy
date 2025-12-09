@@ -10,6 +10,7 @@ import MatchDetailsPanel from './components/MatchDetailsPanel';
 import LaneStatsPanel from './components/LaneStatsPanel';
 import WinLossAnalysis from './components/WinLossAnalysis';
 import SkillGoalSetting from './components/SkillGoalSetting';
+import MotivationPanel from './components/MotivationPanel';
 import ApiKeySettings from './components/ApiKeySettings';
 import { Summoner, LeagueEntry, Match } from '@/types';
 import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
@@ -488,6 +489,7 @@ export default function Home() {
             <GoalSetting />
             <SkillGoalSetting />
             <StatsPanel />
+            <MotivationPanel />
           </div>
         </div>
       </div>
