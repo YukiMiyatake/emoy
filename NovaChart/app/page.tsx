@@ -6,6 +6,7 @@ import SummonerSearch from './components/SummonerSearch';
 import RateChart from './components/RateChart';
 import GoalSetting from './components/GoalSetting';
 import StatsPanel from './components/StatsPanel';
+import MatchDetailsPanel from './components/MatchDetailsPanel';
 import ApiKeySettings from './components/ApiKeySettings';
 import { Summoner, LeagueEntry } from '@/types';
 import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
@@ -399,6 +400,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <RateChart />
+            <MatchDetailsPanel />
           </div>
           <div className="space-y-6">
             <GoalSetting />

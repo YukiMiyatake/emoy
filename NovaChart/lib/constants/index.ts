@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
     SUMMONER_BY_PUUID: '/api/riot/summoner-by-puuid',
     LEAGUE_BY_PUUID: '/api/riot/league-by-puuid',
     FETCH_RATE_HISTORY: '/api/riot/fetch-rate-history',
+    FETCH_MATCH_DETAILS: '/api/riot/fetch-match-details',
     UPDATE: '/api/riot/update',
   },
 } as const;
