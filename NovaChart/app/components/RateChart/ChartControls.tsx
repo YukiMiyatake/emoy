@@ -1,8 +1,7 @@
 'use client';
 
 import { YAxisZoom } from './useYAxisConfig';
-
-type TimeRange = 'all' | '5years' | '1year' | '1month' | '1week';
+import { TimeRange } from './utils/timeRange';
 
 interface ChartControlsProps {
   timeRange: TimeRange;

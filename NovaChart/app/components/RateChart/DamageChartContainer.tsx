@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { DamageChartDataResult } from './useDamageChartData';
 import { YAxisConfig, YAxisZoom } from './useYAxisConfig';
+import { TimeRange } from './utils/timeRange';
 
 interface DamageChartContainerProps {
   chartData: DamageChartDataResult;
@@ -23,6 +24,7 @@ interface DamageChartContainerProps {
   brushEndIndex: number | undefined;
   hiddenLines: Set<string>;
   yAxisZoom: YAxisZoom | null;
+  timeRange: TimeRange;
   onBrushChange: (startIndex: number, endIndex: number) => void;
   onLegendClick: (dataKey: string) => void;
   onYAxisZoom: (zoomIn: boolean) => void;
@@ -36,10 +38,30 @@ export default function DamageChartContainer({
   brushEndIndex,
   hiddenLines,
   yAxisZoom,
+  timeRange,
   onBrushChange,
   onLegendClick,
   onYAxisZoom,
 }: DamageChartContainerProps) {
+  // Calculate X-axis interval based on timeRange and visible data points
+  const getXAxisInterval = (): number | 'preserveStartEnd' => {
+    const effectiveStartIndex = brushStartIndex ?? chartData.brushStartIndex ?? 0;
+    const effectiveEndIndex = brushEndIndex ?? chartData.brushEndIndex ?? chartData.data.length - 1;
+    const visibleDataPoints = Math.max(1, effectiveEndIndex - effectiveStartIndex + 1);
+    
+    switch (timeRange) {
+      case '1week':
+        return 0;
+      case '1month':
+        return visibleDataPoints > 30 ? 1 : 0;
+      case '1year':
+        return visibleDataPoints > 100 ? 2 : 1;
+      case '5years':
+        return visibleDataPoints > 200 ? 5 : 2;
+      default:
+        return 'preserveStartEnd';
+    }
+  };
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,6 +96,7 @@ export default function DamageChartContainer({
             angle={-45}
             textAnchor="end"
             height={80}
+            interval={getXAxisInterval()}
           />
           <YAxis 
             domain={yAxisConfig.yAxisDomain}

@@ -24,7 +24,7 @@ export default function RateChart() {
   const loadGoals = useAppStore((state) => state.loadGoals);
   
   const [chartType, setChartType] = useState<ChartType>('lp');
-  const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [timeRange, setTimeRange] = useState<TimeRange>('1month');
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
   const [movingAverageWindow, setMovingAverageWindow] = useState<number>(7);
@@ -293,6 +293,7 @@ export default function RateChart() {
           brushEndIndex={brushEndIndex}
           hiddenLines={hiddenLines}
           yAxisZoom={yAxisZoom}
+          timeRange={timeRange}
           onBrushChange={(start, end) => {
             setBrushStartIndex(start);
             setBrushEndIndex(end);
@@ -316,6 +317,7 @@ export default function RateChart() {
           brushEndIndex={brushEndIndex}
           hiddenLines={hiddenLines}
           yAxisZoom={yAxisZoom}
+          timeRange={timeRange}
           onBrushChange={(start, end) => {
             setBrushStartIndex(start);
             setBrushEndIndex(end);
@@ -339,6 +341,7 @@ export default function RateChart() {
           brushEndIndex={brushEndIndex}
           hiddenLines={hiddenLines}
           yAxisZoom={yAxisZoom}
+          timeRange={timeRange}
           onBrushChange={(start, end) => {
             setBrushStartIndex(start);
             setBrushEndIndex(end);

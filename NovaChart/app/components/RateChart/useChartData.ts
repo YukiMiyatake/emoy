@@ -34,7 +34,7 @@ export interface ChartDataResult {
   goalData: GoalDataItem[];
 }
 
-type TimeRange = 'all' | '5years' | '1year' | '1month' | '1week';
+import { TimeRange } from './utils/timeRange';
 
 export function useChartData(
   rateHistory: RateHistory[],
@@ -370,9 +370,29 @@ export function useChartData(
         startIdx = 0;
       }
       
-      brushStart = startIdx;
-      brushEnd = finalData.length - 1;
+      // 今日の日付を取得（時刻を0時にリセット）
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayTime = today.getTime();
       
+      // 今日に最も近いデータポイントのインデックスを見つける
+      let todayIdx = finalData.length - 1;
+      for (let i = finalData.length - 1; i >= 0; i--) {
+        if (finalData[i].dateValue <= todayTime) {
+          todayIdx = i;
+          break;
+        }
+      }
+      
+      // 今日が右端の90%の位置に来るように調整
+      // つまり、今日のインデックスが表示範囲の90%の位置に来るようにする
+      const targetTodayPosition = 0.9; // 90%の位置
+      const totalVisiblePoints = Math.max(10, Math.floor((todayIdx - startIdx) / targetTodayPosition));
+      
+      brushStart = Math.max(startIdx, todayIdx - totalVisiblePoints + 1);
+      brushEnd = Math.min(finalData.length - 1, todayIdx + Math.floor(totalVisiblePoints * 0.1));
+      
+      // 最小表示ポイント数を確保
       if (brushEnd - brushStart < 2 && finalData.length > 0) {
         const minVisiblePoints = Math.max(2, Math.floor(finalData.length * 0.1));
         brushStart = Math.max(0, finalData.length - minVisiblePoints);
