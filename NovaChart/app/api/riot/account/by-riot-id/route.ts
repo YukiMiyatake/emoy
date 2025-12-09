@@ -1,40 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { RiotApiClient } from '@/lib/riot/client';
 import { logger } from '@/lib/utils/logger';
 import { handleRiotApiError, getErrorStatusCode } from '@/lib/utils/errorHandler';
+import { validateApiKeyFromSearchParams, ensureGameNameAndTag } from '@/lib/api/middleware';
+import { success, errorResponse } from '@/lib/api/response';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const gameName = searchParams.get('gameName');
-  const tagLine = searchParams.get('tagLine');
   const region = searchParams.get('region') || 'jp1';
-  const apiKeyFromRequest = searchParams.get('apiKey');
+  const { gameName, tagLine, error: nameError } = ensureGameNameAndTag(searchParams);
+  if (nameError) return nameError;
 
-  if (!gameName || !tagLine) {
-    return NextResponse.json(
-      { error: 'Game name and tag line are required' },
-      { status: 400 }
-    );
-  }
-
-  // Try to get API key from request parameter first, then environment variable
-  const apiKey = apiKeyFromRequest || process.env.RIOT_API_KEY;
-  
-  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_api_key_here') {
-    return NextResponse.json(
-      { 
-        error: 'Riot API key is not configured. Please set API key in the app settings or .env.local file.',
-      },
-      { status: 500 }
-    );
-  }
+  const { apiKey, error: apiKeyError } = validateApiKeyFromSearchParams(searchParams);
+  if (apiKeyError || !apiKey) return apiKeyError;
 
   try {
     logger.debug(`[API Route] /api/riot/account/by-riot-id - GameName: ${gameName}, TagLine: ${tagLine}, Region: ${region}`);
     const client = new RiotApiClient(apiKey, region);
     const account = await client.getAccountByRiotId(gameName, tagLine);
     
-    // Get summoner info using PUUID
     const summoner = await client.getSummonerByPuuid(account.puuid);
     
     logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner data:', JSON.stringify(summoner, null, 2));
@@ -42,20 +26,13 @@ export async function GET(request: NextRequest) {
     logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner name:', summoner.name);
     logger.debug('[API Route] /api/riot/account/by-riot-id - Summoner puuid:', summoner.puuid);
     
-    // Note: Database save should be done on client-side
-    return NextResponse.json({
-      account,
-      summoner,
-    });
+    return success({ account, summoner });
   } catch (error) {
     logger.error('[API Route] Riot API Error:', error);
     const errorMessage = handleRiotApiError(error, '/api/riot/account/by-riot-id');
     const statusCode = getErrorStatusCode(error);
     
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
-    );
+    return errorResponse(errorMessage, statusCode);
   }
 }
 
