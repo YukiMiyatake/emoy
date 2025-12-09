@@ -161,7 +161,13 @@ export default function ChartContainer({
                 stroke="#ef4444"
                 strokeWidth={2}
                 strokeDasharray="10 5"
-                dot={{ fill: '#ef4444', r: 4 }}
+                dot={(props: any) => {
+                  // Only show dot on target date
+                  if (props.payload?.isTargetDate) {
+                    return <circle cx={props.cx} cy={props.cy} r={4} fill="#ef4444" />;
+                  }
+                  return <g />;
+                }}
                 activeDot={{ r: 6 }}
                 connectNulls={true}
                 isAnimationActive={false}

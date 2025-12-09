@@ -172,31 +172,58 @@ export function useChartData(
       };
     });
 
-    // Add goal line data points
-    const goalLinePoints: (ChartDataPoint & { dateTime: number; goalIndex?: number })[] = [];
+    // Add goal line data points with linear interpolation for each day
+    const goalLinePoints: (ChartDataPoint & { dateTime: number; goalIndex?: number; isTargetDate?: boolean })[] = [];
     goalData.forEach((goalItem, index) => {
       const startDate = new Date(goalItem.startDate);
       const endDate = new Date(goalItem.targetDate);
-      const startDateStr = formatDateShort(startDate);
-      const endDateStr = formatDateShort(endDate);
       
-      goalLinePoints.push({
-        date: startDateStr,
-        dateValue: goalItem.startDate,
-        dateTime: goalItem.startDate,
-        lp: NaN,
-        [`goalLineLP_${index}`]: goalItem.startLP,
-        goalIndex: index,
-      });
+      // Set to start of day for consistent daily points
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
       
-      goalLinePoints.push({
-        date: endDateStr,
-        dateValue: goalItem.targetDate,
-        dateTime: goalItem.targetDate,
-        lp: NaN,
-        [`goalLineLP_${index}`]: goalItem.goalLP,
-        goalIndex: index,
-      });
+      // Generate daily points from startDate to targetDate using linear interpolation
+      const startTime = startDate.getTime();
+      const endTime = endDate.getTime();
+      const startLP = goalItem.startLP;
+      const endLP = goalItem.goalLP;
+      const totalDays = Math.ceil((endTime - startTime) / (24 * 60 * 60 * 1000));
+      
+      // Handle edge case: same day
+      if (totalDays === 0) {
+        const dateStr = formatDateShort(startDate);
+        goalLinePoints.push({
+          date: dateStr,
+          dateValue: startTime,
+          dateTime: startTime,
+          lp: NaN,
+          [`goalLineLP_${index}`]: endLP,
+          goalIndex: index,
+          isTargetDate: true,
+        });
+        return;
+      }
+      
+      // Calculate daily points
+      for (let day = 0; day <= totalDays; day++) {
+        const currentTime = startTime + day * (24 * 60 * 60 * 1000);
+        const currentDate = new Date(currentTime);
+        const dateStr = formatDateShort(currentDate);
+        
+        // Linear interpolation: LP = startLP + (endLP - startLP) * (day / totalDays)
+        const interpolatedLP = startLP + (endLP - startLP) * (day / totalDays);
+        const isTargetDate = day === totalDays;
+        
+        goalLinePoints.push({
+          date: dateStr,
+          dateValue: currentTime,
+          dateTime: currentTime,
+          lp: NaN,
+          [`goalLineLP_${index}`]: interpolatedLP,
+          goalIndex: index,
+          isTargetDate,
+        });
+      }
     });
 
     // Add goal date points
