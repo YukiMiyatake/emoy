@@ -23,17 +23,14 @@ export default function RateChart() {
 
   // Load data on mount - only once
   useEffect(() => {
-    console.log('RateChart: useEffect triggered, loading data from store...');
     const loadData = async () => {
       try {
         await loadRateHistory();
-        console.log('RateChart: Rate history loaded');
       } catch (error) {
         console.error('RateChart: Error loading rate history:', error);
       }
       try {
         await loadGoals();
-        console.log('RateChart: Goals loaded');
       } catch (error) {
         console.error('RateChart: Error loading goals:', error);
       }
@@ -42,23 +39,8 @@ export default function RateChart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run on mount
 
-  console.log('RateChart render:', {
-    rateHistoryLength: rateHistory.length,
-    goalsLength: goals?.length || 0,
-  });
-
   const chartData = useChartData(rateHistory, goals, timeRange, movingAverageWindow);
   const yAxisConfig = useYAxisConfig(chartData, brushStartIndex, brushEndIndex, yAxisZoom);
-
-  console.log('RateChart after hooks:', {
-    chartDataLength: chartData.data?.length || 0,
-    yAxisDomain: yAxisConfig.yAxisDomain,
-    yAxisDomainMin: yAxisConfig.yAxisDomain[0],
-    yAxisDomainMax: yAxisConfig.yAxisDomain[1],
-    yAxisTicks: yAxisConfig.yAxisTicks,
-    brushStartIndex,
-    brushEndIndex,
-  });
 
   // Track if brush has been initialized or manually set by user
   const brushInitializedRef = useRef<string | null>(null); // Store timeRange key to track initialization per timeRange
@@ -165,7 +147,6 @@ export default function RateChart() {
   }, [handleYAxisZoom]);
 
   if (rateHistory.length === 0) {
-    console.log('RateChart: No rate history data');
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold mb-4">レート推移</h2>
@@ -173,8 +154,6 @@ export default function RateChart() {
       </div>
     );
   }
-
-  console.log('RateChart: Rendering chart container');
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -195,7 +174,6 @@ export default function RateChart() {
         hiddenLines={hiddenLines}
         yAxisZoom={yAxisZoom}
         onBrushChange={(start, end) => {
-          console.log('[RateChart] onBrushChange called:', { start, end, currentBrushStart: brushStartIndex, currentBrushEnd: brushEndIndex });
           setBrushStartIndex(start);
           setBrushEndIndex(end);
           brushStartIndexRef.current = start;
