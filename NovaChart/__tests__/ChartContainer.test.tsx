@@ -35,10 +35,11 @@ vi.mock('../lib/riot/client', async () => {
 });
 
 // Import after mocks
-import ChartContainer from '../app/components/RateChart/ChartContainer';
+import BaseChartContainer from '../app/components/RateChart/BaseChartContainer';
+import { lpChartConfig } from '../app/components/RateChart/chartConfigs';
 import { Line, ResponsiveContainer } from 'recharts';
 
-describe('ChartContainer', () => {
+describe('BaseChartContainer', () => {
   const createChartData = (overrides?: Partial<ChartDataResult>): ChartDataResult => ({
     data: [
       { date: '1/1', dateValue: 1000, lp: 1200 },
@@ -67,9 +68,11 @@ describe('ChartContainer', () => {
     brushEndIndex: undefined,
     hiddenLines: new Set<string>(),
     yAxisZoom: null,
+    timeRange: 'all' as const,
     onBrushChange: vi.fn(),
     onLegendClick: vi.fn(),
     onYAxisZoom: vi.fn(),
+    chartConfig: lpChartConfig,
   };
 
   beforeEach(() => {
@@ -79,7 +82,7 @@ describe('ChartContainer', () => {
   it('renders without crashing', () => {
     // Just verify the component can be instantiated
     expect(() => {
-      React.createElement(ChartContainer, defaultProps);
+      React.createElement(BaseChartContainer, defaultProps);
     }).not.toThrow();
   });
 
@@ -91,7 +94,7 @@ describe('ChartContainer', () => {
       ],
     });
     expect(() => {
-      React.createElement(ChartContainer, { ...defaultProps, chartData });
+      React.createElement(BaseChartContainer, { ...defaultProps, chartData });
     }).not.toThrow();
   });
 
@@ -103,14 +106,14 @@ describe('ChartContainer', () => {
       ],
     });
     expect(() => {
-      React.createElement(ChartContainer, { ...defaultProps, chartData });
+      React.createElement(BaseChartContainer, { ...defaultProps, chartData });
     }).not.toThrow();
   });
 
   it('accepts hiddenLines prop correctly', () => {
     const hiddenLines = new Set(['lp', 'movingAverage']);
     expect(() => {
-      React.createElement(ChartContainer, { ...defaultProps, hiddenLines });
+      React.createElement(BaseChartContainer, { ...defaultProps, hiddenLines });
     }).not.toThrow();
   });
 
@@ -138,26 +141,26 @@ describe('ChartContainer', () => {
       ],
     });
     expect(() => {
-      React.createElement(ChartContainer, { ...defaultProps, chartData });
+      React.createElement(BaseChartContainer, { ...defaultProps, chartData });
     }).not.toThrow();
   });
 
   it('accepts movingAverageWindow prop correctly', () => {
     expect(() => {
-      React.createElement(ChartContainer, { ...defaultProps, movingAverageWindow: 14 });
+      React.createElement(BaseChartContainer, { ...defaultProps, movingAverageWindow: 14 });
     }).not.toThrow();
   });
 
   it('handles empty goalData array', () => {
     const chartData = createChartData({ goalData: [] });
     expect(() => {
-      React.createElement(ChartContainer, { ...defaultProps, chartData });
+      React.createElement(BaseChartContainer, { ...defaultProps, chartData });
     }).not.toThrow();
   });
 
   it('accepts all required props without errors', () => {
     expect(() => {
-      React.createElement(ChartContainer, defaultProps);
+      React.createElement(BaseChartContainer, defaultProps);
     }).not.toThrow();
   });
 });

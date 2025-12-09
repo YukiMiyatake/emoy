@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Match } from '@/types';
 import { formatDateShort } from '@/lib/utils/date';
+import { calculateMovingAverage } from '@/lib/analytics/prediction';
 import { TimeRange } from './utils/timeRange';
 
 export interface CSChartDataPoint {
@@ -16,19 +17,6 @@ export interface CSChartDataResult {
   yAxisTicks: number[];
   brushStartIndex: number | undefined;
   brushEndIndex: number | undefined;
-}
-
-function calculateMovingAverage(data: number[], window: number): number[] {
-  if (data.length === 0) return [];
-  
-  const result: number[] = [];
-  for (let i = 0; i < data.length; i++) {
-    const start = Math.max(0, i - window + 1);
-    const slice = data.slice(start, i + 1);
-    const sum = slice.reduce((a, b) => a + b, 0);
-    result.push(sum / slice.length);
-  }
-  return result;
 }
 
 export function useCSChartData(

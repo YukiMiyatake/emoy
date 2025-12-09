@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { useChartData } from './useChartData';
 import { useCSChartData } from './useCSChartData';
@@ -10,9 +10,8 @@ import { useCSYAxisConfig } from './useCSYAxisConfig';
 import { useDamageYAxisConfig } from './useDamageYAxisConfig';
 import { TimeRange } from './utils/timeRange';
 import ChartControls from './ChartControls';
-import ChartContainer from './ChartContainer';
-import CSChartContainer from './CSChartContainer';
-import DamageChartContainer from './DamageChartContainer';
+import BaseChartContainer from './BaseChartContainer';
+import { lpChartConfig, csChartConfig, damageChartConfig } from './chartConfigs';
 
 export type ChartType = 'lp' | 'cs' | 'damage';
 
@@ -68,16 +67,39 @@ export default function RateChart() {
     brushEndIndexRef.current = brushEndIndex;
   }, [brushStartIndex, brushEndIndex]);
   
+  // Chart configuration map
+  const chartConfigs = useMemo(() => ({
+    lp: {
+      data: chartData,
+      yAxisConfig,
+      chartConfig: lpChartConfig,
+      minRange: 50,
+      maxRange: 5000,
+    },
+    cs: {
+      data: csChartData,
+      yAxisConfig: csYAxisConfig,
+      chartConfig: csChartConfig,
+      minRange: 0.5,
+      maxRange: 100,
+    },
+    damage: {
+      data: damageChartData,
+      yAxisConfig: damageYAxisConfig,
+      chartConfig: damageChartConfig,
+      minRange: 50,
+      maxRange: 5000,
+    },
+  }), [chartData, csChartData, damageChartData, yAxisConfig, csYAxisConfig, damageYAxisConfig]);
+
+  const currentConfig = chartConfigs[chartType];
+  
   // Initialize brush indices from chartData only when:
   // 1. Not yet initialized for current timeRange and chartType
   // 2. brushStartIndex/brushEndIndex are undefined (not set by user)
   // 3. chartData has valid brush indices
   useEffect(() => {
-    const currentChartData = chartType === 'lp' 
-      ? chartData 
-      : chartType === 'cs'
-      ? csChartData
-      : damageChartData;
+    const currentChartData = currentConfig.data;
     
     // Include brushStartIndex and brushEndIndex in key to detect data reloads
     // This ensures reinitialization when data is cleared and reloaded with same length
@@ -91,7 +113,7 @@ export default function RateChart() {
         brushInitializedRef.current = timeRangeKey;
       }
     }
-  }, [chartType, chartData.brushStartIndex, chartData.brushEndIndex, chartData.data?.length, csChartData.brushStartIndex, csChartData.brushEndIndex, csChartData.data?.length, damageChartData.brushStartIndex, damageChartData.brushEndIndex, damageChartData.data?.length, timeRange]);
+  }, [chartType, timeRange, currentConfig.data]);
 
   // Reset brush when timeRange or chartType changes
   const handleTimeRangeChange = (newRange: TimeRange) => {
@@ -129,12 +151,7 @@ export default function RateChart() {
 
   // Handle Y-axis zoom
   const handleYAxisZoom = useCallback((zoomIn: boolean) => {
-    const currentDomain =
-      chartType === 'lp'
-        ? yAxisConfig.yAxisDomain
-        : chartType === 'cs'
-        ? csYAxisConfig.yAxisDomain
-        : damageYAxisConfig.yAxisDomain;
+    const currentDomain = currentConfig.yAxisConfig.yAxisDomain;
 
     if (!currentDomain || !Array.isArray(currentDomain)) return;
     
@@ -158,27 +175,13 @@ export default function RateChart() {
       newRange = currentRange * (1 + zoomFactor);
     }
     
-    // グラフタイプごとに適切なズーム幅を設定
-    const minRange =
-      chartType === 'lp'
-        ? 50
-        : chartType === 'cs'
-        ? 0.5
-        : 50; // damage
-
-    const maxRange =
-      chartType === 'lp'
-        ? 5000
-        : chartType === 'cs'
-        ? 100
-        : 5000;
-    newRange = Math.max(minRange, Math.min(maxRange, newRange));
+    newRange = Math.max(currentConfig.minRange, Math.min(currentConfig.maxRange, newRange));
     
     const newMin = Math.max(0, center - newRange / 2);
     const newMax = center + newRange / 2;
     
     setYAxisZoom({ min: newMin, max: newMax });
-  }, [chartType, yAxisConfig.yAxisDomain, csYAxisConfig.yAxisDomain, damageYAxisConfig.yAxisDomain, yAxisZoom]);
+  }, [currentConfig, yAxisZoom]);
 
   // Handle keyboard events for numpad +/-
   useEffect(() => {
@@ -196,83 +199,66 @@ export default function RateChart() {
     };
   }, [handleYAxisZoom]);
 
-  const hasData = chartType === 'lp' 
-    ? rateHistory.length > 0 
-    : chartType === 'cs'
-    ? matches.filter(m => m.csPerMin !== undefined).length > 0
-    : matches.filter(m => m.damageToChampions !== undefined && m.gameDuration !== undefined).length > 0;
+  // Common brush change handler
+  const handleBrushChange = useCallback((start: number, end: number) => {
+    setBrushStartIndex(start);
+    setBrushEndIndex(end);
+    brushStartIndexRef.current = start;
+    brushEndIndexRef.current = end;
+    setYAxisZoom(null);
+    const currentChartData = currentConfig.data;
+    const timeRangeKey = `${chartType}-${timeRange}-${currentChartData.data?.length || 0}-${currentChartData.brushStartIndex ?? 'null'}-${currentChartData.brushEndIndex ?? 'null'}`;
+    brushInitializedRef.current = timeRangeKey;
+  }, [chartType, timeRange, currentConfig.data]);
 
-  const title =
-    chartType === 'lp'
-      ? 'LP推移'
-      : chartType === 'cs'
-      ? 'CS推移'
-      : 'ダメージ推移';
+  const chartMetadata = useMemo(() => ({
+    lp: {
+      title: 'LP推移',
+      hasData: rateHistory.length > 0,
+      noDataMessage: 'データがありません。Riot APIからデータを取得するか、手動でデータを追加してください。',
+    },
+    cs: {
+      title: 'CS推移',
+      hasData: matches.filter(m => m.csPerMin !== undefined).length > 0,
+      noDataMessage: 'CS/分のデータがありません。試合詳細データを取得してください。',
+    },
+    damage: {
+      title: 'ダメージ推移',
+      hasData: matches.filter(m => m.damageToChampions !== undefined && m.gameDuration !== undefined).length > 0,
+      noDataMessage: 'ダメージ/分のデータがありません。試合詳細データを取得してください。',
+    },
+  }), [rateHistory, matches]);
 
-  if (!hasData) {
+  const metadata = chartMetadata[chartType];
+
+  if (!metadata.hasData) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">{title}</h2>
-        <p className="text-gray-500">
-          {chartType === 'lp' 
-            ? 'データがありません。Riot APIからデータを取得するか、手動でデータを追加してください。'
-            : chartType === 'cs'
-            ? 'CS/分のデータがありません。試合詳細データを取得してください。'
-            : 'ダメージ/分のデータがありません。試合詳細データを取得してください。'}
-        </p>
+        <h2 className="text-2xl font-bold mb-4">{metadata.title}</h2>
+        <p className="text-gray-500">{metadata.noDataMessage}</p>
       </div>
     );
   }
 
-  const getCurrentChartData = () => {
-    switch (chartType) {
-      case 'lp':
-        return chartData;
-      case 'cs':
-        return csChartData;
-      case 'damage':
-        return damageChartData;
-    }
-  };
-
-  const currentChartData = getCurrentChartData();
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">{title}</h2>
+      <h2 className="text-2xl font-bold mb-4">{metadata.title}</h2>
 
       {/* タブ */}
       <div className="flex gap-2 mb-4 border-b border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => handleChartTypeChange('lp')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
-            chartType === 'lp'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          LP推移
-        </button>
-        <button
-          onClick={() => handleChartTypeChange('cs')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
-            chartType === 'cs'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          CS推移
-        </button>
-        <button
-          onClick={() => handleChartTypeChange('damage')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
-            chartType === 'damage'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-          }`}
-        >
-          ダメージ推移
-        </button>
+        {(Object.keys(chartMetadata) as ChartType[]).map((type) => (
+          <button
+            key={type}
+            onClick={() => handleChartTypeChange(type)}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+              chartType === type
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            {chartMetadata[type].title}
+          </button>
+        ))}
       </div>
 
       <ChartControls
@@ -284,77 +270,20 @@ export default function RateChart() {
         onYAxisZoomReset={() => setYAxisZoom(null)}
       />
       
-      {chartType === 'lp' && (
-        <ChartContainer
-          chartData={chartData}
-          yAxisConfig={yAxisConfig}
-          movingAverageWindow={movingAverageWindow}
-          brushStartIndex={brushStartIndex}
-          brushEndIndex={brushEndIndex}
-          hiddenLines={hiddenLines}
-          yAxisZoom={yAxisZoom}
-          timeRange={timeRange}
-          onBrushChange={(start, end) => {
-            setBrushStartIndex(start);
-            setBrushEndIndex(end);
-            brushStartIndexRef.current = start;
-            brushEndIndexRef.current = end;
-            setYAxisZoom(null);
-            const timeRangeKey = `${chartType}-${timeRange}-${chartData.data?.length || 0}-${chartData.brushStartIndex ?? 'null'}-${chartData.brushEndIndex ?? 'null'}`;
-            brushInitializedRef.current = timeRangeKey;
-          }}
-          onLegendClick={handleLegendClick}
-          onYAxisZoom={handleYAxisZoom}
-        />
-      )}
-      
-      {chartType === 'cs' && (
-        <CSChartContainer
-          chartData={csChartData}
-          yAxisConfig={csYAxisConfig}
-          movingAverageWindow={movingAverageWindow}
-          brushStartIndex={brushStartIndex}
-          brushEndIndex={brushEndIndex}
-          hiddenLines={hiddenLines}
-          yAxisZoom={yAxisZoom}
-          timeRange={timeRange}
-          onBrushChange={(start, end) => {
-            setBrushStartIndex(start);
-            setBrushEndIndex(end);
-            brushStartIndexRef.current = start;
-            brushEndIndexRef.current = end;
-            setYAxisZoom(null);
-            const timeRangeKey = `${chartType}-${timeRange}-${csChartData.data?.length || 0}-${csChartData.brushStartIndex ?? 'null'}-${csChartData.brushEndIndex ?? 'null'}`;
-            brushInitializedRef.current = timeRangeKey;
-          }}
-          onLegendClick={handleLegendClick}
-          onYAxisZoom={handleYAxisZoom}
-        />
-      )}
-      
-      {chartType === 'damage' && (
-        <DamageChartContainer
-          chartData={damageChartData}
-          yAxisConfig={damageYAxisConfig}
-          movingAverageWindow={movingAverageWindow}
-          brushStartIndex={brushStartIndex}
-          brushEndIndex={brushEndIndex}
-          hiddenLines={hiddenLines}
-          yAxisZoom={yAxisZoom}
-          timeRange={timeRange}
-          onBrushChange={(start, end) => {
-            setBrushStartIndex(start);
-            setBrushEndIndex(end);
-            brushStartIndexRef.current = start;
-            brushEndIndexRef.current = end;
-            setYAxisZoom(null);
-            const timeRangeKey = `${chartType}-${timeRange}-${damageChartData.data?.length || 0}-${damageChartData.brushStartIndex ?? 'null'}-${damageChartData.brushEndIndex ?? 'null'}`;
-            brushInitializedRef.current = timeRangeKey;
-          }}
-          onLegendClick={handleLegendClick}
-          onYAxisZoom={handleYAxisZoom}
-        />
-      )}
+      <BaseChartContainer
+        chartData={currentConfig.data}
+        yAxisConfig={currentConfig.yAxisConfig}
+        movingAverageWindow={movingAverageWindow}
+        brushStartIndex={brushStartIndex}
+        brushEndIndex={brushEndIndex}
+        hiddenLines={hiddenLines}
+        yAxisZoom={yAxisZoom}
+        timeRange={timeRange}
+        onBrushChange={handleBrushChange}
+        onLegendClick={handleLegendClick}
+        onYAxisZoom={handleYAxisZoom}
+        chartConfig={currentConfig.chartConfig}
+      />
     </div>
   );
 }

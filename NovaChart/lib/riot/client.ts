@@ -304,6 +304,11 @@ export class RiotApiClient {
 
 // Utility function to convert tier and rank to LP value for comparison
 export function tierRankToLP(tier: string, rank: string, lp: number): number {
+  // Defensive check for undefined/null values
+  if (!tier || typeof tier !== 'string') {
+    return 0;
+  }
+
   const tierValues: Record<string, number> = {
     'IRON': 0,
     'BRONZE': 400,
@@ -324,15 +329,16 @@ export function tierRankToLP(tier: string, rank: string, lp: number): number {
     'I': 300,
   };
 
-  const baseLP = tierValues[tier.toUpperCase()] || 0;
-  const rankLP = rankValues[rank.toUpperCase()] || 0;
+  const tierUpper = tier.toUpperCase();
+  const baseLP = tierValues[tierUpper] || 0;
+  const rankLP = rank && typeof rank === 'string' ? (rankValues[rank.toUpperCase()] || 0) : 0;
   
   // Master, Grandmaster, Challenger don't have ranks
-  if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tier.toUpperCase())) {
-    return baseLP + lp;
+  if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tierUpper)) {
+    return baseLP + (lp || 0);
   }
 
-  return baseLP + rankLP + lp;
+  return baseLP + rankLP + (lp || 0);
 }
 
 export function lpToTierRank(totalLP: number): { tier: string; rank: string; lp: number } {
