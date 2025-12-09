@@ -4,13 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { useChartData } from './useChartData';
 import { useYAxisConfig, YAxisZoom } from './useYAxisConfig';
+import { TimeRange } from './utils/timeRange';
 import ChartControls from './ChartControls';
 import ChartContainer from './ChartContainer';
 
-type TimeRange = 'all' | '5years' | '1year' | '1month' | '1week';
-
 export default function RateChart() {
-  const { rateHistory, goals } = useAppStore();
+  const rateHistory = useAppStore((state) => state.rateHistory);
+  const goals = useAppStore((state) => state.goals);
+  const loadRateHistory = useAppStore((state) => state.loadRateHistory);
+  const loadGoals = useAppStore((state) => state.loadGoals);
+  
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
@@ -18,14 +21,56 @@ export default function RateChart() {
   const [yAxisZoom, setYAxisZoom] = useState<YAxisZoom | null>(null);
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
 
+  // Load data on mount - only once
+  useEffect(() => {
+    console.log('RateChart: useEffect triggered, loading data from store...');
+    const loadData = async () => {
+      try {
+        await loadRateHistory();
+        console.log('RateChart: Rate history loaded');
+      } catch (error) {
+        console.error('RateChart: Error loading rate history:', error);
+      }
+      try {
+        await loadGoals();
+        console.log('RateChart: Goals loaded');
+      } catch (error) {
+        console.error('RateChart: Error loading goals:', error);
+      }
+    };
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run on mount
+
+  console.log('RateChart render:', {
+    rateHistoryLength: rateHistory.length,
+    goalsLength: goals?.length || 0,
+  });
+
   const chartData = useChartData(rateHistory, goals, timeRange, movingAverageWindow);
   const yAxisConfig = useYAxisConfig(chartData, brushStartIndex, brushEndIndex, yAxisZoom);
+
+  console.log('RateChart after hooks:', {
+    chartDataLength: chartData.data?.length || 0,
+    yAxisDomain: yAxisConfig.yAxisDomain,
+  });
+
+  // Initialize brush indices from chartData when they are undefined
+  useEffect(() => {
+    if (brushStartIndex === undefined && chartData.brushStartIndex !== undefined) {
+      setBrushStartIndex(chartData.brushStartIndex);
+    }
+    if (brushEndIndex === undefined && chartData.brushEndIndex !== undefined) {
+      setBrushEndIndex(chartData.brushEndIndex);
+    }
+  }, [chartData.brushStartIndex, chartData.brushEndIndex, brushStartIndex, brushEndIndex]);
 
   // Reset brush when timeRange changes
   const handleTimeRangeChange = (newRange: TimeRange) => {
     setTimeRange(newRange);
     setBrushStartIndex(undefined);
     setBrushEndIndex(undefined);
+    setYAxisZoom(null); // Reset zoom when timeRange changes
   };
 
   // Handle legend click to toggle line visibility
@@ -92,6 +137,7 @@ export default function RateChart() {
   }, [handleYAxisZoom]);
 
   if (rateHistory.length === 0) {
+    console.log('RateChart: No rate history data');
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold mb-4">レート推移</h2>
@@ -99,6 +145,8 @@ export default function RateChart() {
       </div>
     );
   }
+
+  console.log('RateChart: Rendering chart container');
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">

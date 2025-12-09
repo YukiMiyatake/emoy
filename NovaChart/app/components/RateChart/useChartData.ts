@@ -192,15 +192,15 @@ export function useChartData(
       // Handle edge case: same day
       if (totalDays === 0) {
         const dateStr = formatDateShort(startDate);
-        goalLinePoints.push({
+      goalLinePoints.push({
           date: dateStr,
           dateValue: startTime,
           dateTime: startTime,
-          lp: NaN,
+        lp: NaN,
           [`goalLineLP_${index}`]: endLP,
-          goalIndex: index,
+        goalIndex: index,
           isTargetDate: true,
-        });
+      });
         return;
       }
       
@@ -213,16 +213,16 @@ export function useChartData(
         // Linear interpolation: LP = startLP + (endLP - startLP) * (day / totalDays)
         const interpolatedLP = startLP + (endLP - startLP) * (day / totalDays);
         const isTargetDate = day === totalDays;
-        
-        goalLinePoints.push({
+      
+      goalLinePoints.push({
           date: dateStr,
           dateValue: currentTime,
           dateTime: currentTime,
-          lp: NaN,
+        lp: NaN,
           [`goalLineLP_${index}`]: interpolatedLP,
-          goalIndex: index,
+        goalIndex: index,
           isTargetDate,
-        });
+      });
       }
     });
 

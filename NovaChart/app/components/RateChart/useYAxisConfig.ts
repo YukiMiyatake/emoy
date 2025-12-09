@@ -26,64 +26,58 @@ export function useYAxisConfig(
     }
 
     // Determine displayed data range based on Brush selection
-    const displayedStart = brushStartIndex !== undefined 
+    // Priority: brushStartIndex/brushEndIndex (explicit selection) > chartData.brushStartIndex/brushEndIndex (initial range) > full range
+    const effectiveStartIndex = brushStartIndex !== undefined 
       ? brushStartIndex 
       : (chartData.brushStartIndex !== undefined ? chartData.brushStartIndex : 0);
-    const displayedEnd = brushEndIndex !== undefined 
+    const effectiveEndIndex = brushEndIndex !== undefined 
       ? brushEndIndex 
       : (chartData.brushEndIndex !== undefined ? chartData.brushEndIndex : chartData.data.length - 1);
+    
+    // Ensure valid range
+    const displayedStart = Math.max(0, Math.min(effectiveStartIndex, chartData.data.length - 1));
+    const displayedEnd = Math.max(displayedStart, Math.min(effectiveEndIndex, chartData.data.length - 1));
     const displayedData = chartData.data.slice(displayedStart, displayedEnd + 1);
+    
+    // Debug log
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useYAxisConfig] Brush range:', {
+        brushStartIndex,
+        brushEndIndex,
+        chartDataBrushStart: chartData.brushStartIndex,
+        chartDataBrushEnd: chartData.brushEndIndex,
+        effectiveStart: displayedStart,
+        effectiveEnd: displayedEnd,
+        displayedDataLength: displayedData.length,
+        totalDataLength: chartData.data.length,
+      });
+    }
 
-    // Get LP values from displayed data
-    const lpValues = displayedData
-      .map(d => (d as any).lp)
-      .filter((lp: any) => !isNaN(lp) && lp !== undefined);
+    // Get LP values from displayed data (including lp, movingAverage, predictedLP)
+    const lpValues: number[] = [];
+    displayedData.forEach((d: any) => {
+      if (!isNaN(d.lp) && d.lp !== undefined) {
+        lpValues.push(d.lp);
+      }
+      if (!isNaN(d.movingAverage) && d.movingAverage !== undefined) {
+        lpValues.push(d.movingAverage);
+      }
+      if (!isNaN(d.predictedLP) && d.predictedLP !== undefined) {
+        lpValues.push(d.predictedLP);
+      }
+    });
 
-    // Add goal LP values that fall within the displayed date range
+    // Get goal LP values from displayed data (goalLineLP_${index} values)
     const goalLPValues: number[] = [];
     if (displayedData.length > 0 && chartData.goalData) {
-      const displayedStartDate = (displayedData[0] as any).dateValue;
-      const displayedEndDate = (displayedData[displayedData.length - 1] as any).dateValue;
-
-      chartData.goalData.forEach((goalItem: any) => {
-        const goalStartDate = goalItem.startDate;
-        const goalTargetDate = goalItem.targetDate;
-
-        const goalLineIntersects = 
-          (goalStartDate >= displayedStartDate && goalStartDate <= displayedEndDate) ||
-          (goalTargetDate >= displayedStartDate && goalTargetDate <= displayedEndDate) ||
-          (goalStartDate <= displayedStartDate && goalTargetDate >= displayedEndDate);
-
-        if (goalLineIntersects) {
-          const goalDateRange = goalTargetDate - goalStartDate;
-          
-          if (goalDateRange === 0) {
-            if (goalStartDate >= displayedStartDate && goalStartDate <= displayedEndDate) {
-              goalLPValues.push(goalItem.startLP);
-              goalLPValues.push(goalItem.goalLP);
+      chartData.goalData.forEach((goalItem: any, index: number) => {
+        const goalDataKey = `goalLineLP_${index}`;
+        displayedData.forEach((d: any) => {
+          const goalLP = d[goalDataKey];
+          if (!isNaN(goalLP) && goalLP !== undefined) {
+            goalLPValues.push(goalLP);
             }
-          } else {
-            const lpAtDisplayedStart = goalStartDate <= displayedStartDate && goalTargetDate >= displayedStartDate
-              ? goalItem.startLP + (goalItem.goalLP - goalItem.startLP) * (displayedStartDate - goalStartDate) / goalDateRange
-              : null;
-            const lpAtDisplayedEnd = goalStartDate <= displayedEndDate && goalTargetDate >= displayedEndDate
-              ? goalItem.startLP + (goalItem.goalLP - goalItem.startLP) * (displayedEndDate - goalStartDate) / goalDateRange
-              : null;
-            
-            if (goalStartDate >= displayedStartDate && goalStartDate <= displayedEndDate) {
-              goalLPValues.push(goalItem.startLP);
-            }
-            if (goalTargetDate >= displayedStartDate && goalTargetDate <= displayedEndDate) {
-              goalLPValues.push(goalItem.goalLP);
-            }
-            if (lpAtDisplayedStart !== null) {
-              goalLPValues.push(lpAtDisplayedStart);
-            }
-            if (lpAtDisplayedEnd !== null) {
-              goalLPValues.push(lpAtDisplayedEnd);
-            }
-          }
-        }
+        });
       });
     }
 
