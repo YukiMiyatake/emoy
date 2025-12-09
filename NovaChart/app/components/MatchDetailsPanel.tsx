@@ -9,6 +9,7 @@ export default function MatchDetailsPanel() {
   const { matches, loadMatches } = useAppStore();
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [matchRatings, setMatchRatings] = useState<Map<number, MatchRatingResult>>(new Map());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadMatches();
@@ -40,10 +41,39 @@ export default function MatchDetailsPanel() {
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
 
+  const handleDeleteAllMatches = async () => {
+    if (!confirm('すべての試合詳細データを削除しますか？この操作は取り消せません。')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const { matchService } = await import('@/lib/db');
+      await matchService.deleteAll();
+      await loadMatches();
+      alert('試合詳細データを削除しました');
+    } catch (error) {
+      console.error('Failed to delete matches:', error);
+      alert('試合詳細データの削除に失敗しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">試合詳細</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">試合詳細</h2>
+        {matches.length > 0 && (
+          <button
+            onClick={handleDeleteAllMatches}
+            disabled={isDeleting}
+            className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDeleting ? '削除中...' : '試合データ削除'}
+          </button>
+        )}
+      </div>
 
       {recentMatches.length === 0 ? (
         <div className="text-center py-8">

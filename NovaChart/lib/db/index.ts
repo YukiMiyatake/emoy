@@ -115,6 +115,10 @@ export const goalService = {
   async delete(id: number): Promise<void> {
     return await db.goals.delete(id);
   },
+
+  async deleteAll(): Promise<void> {
+    return await db.goals.clear();
+  },
 };
 
 export const matchService = {
@@ -139,6 +143,10 @@ export const matchService = {
 
   async delete(id: number): Promise<void> {
     return await db.matches.delete(id);
+  },
+
+  async deleteAll(): Promise<void> {
+    return await db.matches.clear();
   },
 
   async getWinRate(role?: string, champion?: string): Promise<number> {
@@ -175,6 +183,10 @@ export const summonerService = {
 
   async delete(puuid: string): Promise<void> {
     return await db.summoners.delete(puuid);
+  },
+
+  async deleteAll(): Promise<void> {
+    return await db.summoners.clear();
   },
 };
 

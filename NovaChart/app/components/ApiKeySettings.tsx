@@ -51,6 +51,37 @@ export default function ApiKeySettings({
     setRegion(DEFAULTS.REGION);
   };
 
+  const handleDeleteAllData = async () => {
+    if (!confirm('すべてのデータベース情報を削除しますか？この操作は取り消せません。\n\n削除されるデータ:\n- レート履歴\n- 目標設定\n- 試合詳細\n- サマナー情報\n- リーグエントリー')) {
+      return;
+    }
+
+    try {
+      const { rateHistoryService, goalService, matchService, summonerService, leagueEntryService } = await import('@/lib/db');
+      
+      await Promise.all([
+        rateHistoryService.deleteAll(),
+        goalService.deleteAll?.() || Promise.resolve(),
+        matchService.deleteAll(),
+        summonerService.deleteAll?.() || Promise.resolve(),
+        leagueEntryService.deleteAll(),
+      ]);
+
+      // ストアもリセット
+      const { useAppStore } = await import('@/lib/store/useAppStore');
+      useAppStore.getState().loadRateHistory();
+      useAppStore.getState().loadGoals();
+      useAppStore.getState().loadMatches();
+      useAppStore.getState().setCurrentSummoner(null);
+      useAppStore.getState().setCurrentLeagueEntry(null);
+
+      alert('すべてのデータベース情報を削除しました');
+    } catch (error) {
+      console.error('Failed to delete all data:', error);
+      alert('データの削除に失敗しました');
+    }
+  };
+
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg shadow ${isExpanded ? 'p-4' : 'p-2'}`}>
       <div className="flex items-center justify-between">
@@ -109,6 +140,16 @@ export default function ApiKeySettings({
             className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           >
             クリア
+          </button>
+        </div>
+
+        <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">デバッグ用</p>
+          <button
+            onClick={handleDeleteAllData}
+            className="w-full px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+          >
+            DB情報全削除
           </button>
         </div>
         </div>
