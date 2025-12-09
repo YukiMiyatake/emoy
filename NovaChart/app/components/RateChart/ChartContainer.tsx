@@ -148,7 +148,7 @@ export default function ChartContainer({
             strokeDasharray="3 3"
             name="予測"
             dot={false}
-            connectNulls={false}
+            connectNulls={true}
             hide={hiddenLines.has('predictedLP')}
           />
           {Array.isArray(chartData.goalData) && chartData.goalData.map((goalItem, index) => {

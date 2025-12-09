@@ -126,6 +126,17 @@ export function useChartData(
       };
     });
 
+    // Add predictedLP to the last data point to connect prediction line
+    if (predictionPoints.length > 0 && dataPoints.length > 0) {
+      const lastDataPoint = dataPoints[dataPoints.length - 1];
+      const firstPredictionPoint = predictionPoints[0];
+      // Set predictedLP on the last data point if it doesn't already have it
+      // This ensures the prediction line connects from the last actual data point
+      if (lastDataPoint.predictedLP === undefined) {
+        lastDataPoint.predictedLP = firstPredictionPoint.predictedLP;
+      }
+    }
+
     // Add goal lines for all goals
     const sortedGoals = (Array.isArray(goals) ? goals : []).sort((a, b) => 
       new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime()
@@ -240,6 +251,30 @@ export function useChartData(
 
     // Combine and sort by dateTime
     let combined = [...dataPoints, ...predictionPoints, ...goalDatePoints, ...goalLinePoints].sort((a, b) => a.dateTime - b.dateTime);
+    
+    // Merge points with the same dateTime to ensure prediction line connects properly
+    const mergedMap = new Map<number, ChartDataPoint & { dateTime: number; originalEntry?: RateHistory; goalIndex?: number; isTargetDate?: boolean; [key: string]: any }>();
+    combined.forEach(point => {
+      const existing = mergedMap.get(point.dateTime);
+      if (existing) {
+        // Merge properties, prioritizing data point values over prediction values
+        mergedMap.set(point.dateTime, {
+          ...existing,
+          ...point,
+          // Keep lp from data point if it exists, otherwise use prediction point's lp
+          lp: !isNaN(existing.lp) ? existing.lp : point.lp,
+          // Merge predictedLP if it exists
+          predictedLP: point.predictedLP !== undefined ? point.predictedLP : existing.predictedLP,
+          // Merge movingAverage if it exists
+          movingAverage: point.movingAverage !== undefined ? point.movingAverage : existing.movingAverage,
+          // Keep originalEntry if it exists
+          originalEntry: existing.originalEntry || point.originalEntry,
+        });
+      } else {
+        mergedMap.set(point.dateTime, point);
+      }
+    });
+    combined = Array.from(mergedMap.values()).sort((a, b) => a.dateTime - b.dateTime);
     
     // Extend moving average to display range end
     const lastDataPointWithMA = dataPoints.filter(d => d.movingAverage !== undefined).pop();
