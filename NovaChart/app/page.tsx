@@ -8,14 +8,14 @@ import GoalSetting from './components/GoalSetting';
 import StatsPanel from './components/StatsPanel';
 import MatchDetailsPanel from './components/MatchDetailsPanel';
 import ApiKeySettings from './components/ApiKeySettings';
-import { Summoner, LeagueEntry } from '@/types';
+import { Summoner, LeagueEntry, Match } from '@/types';
 import { STORAGE_KEYS, API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
 import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
 import { StorageService } from '@/lib/utils/storage';
 import { logger } from '@/lib/utils/logger';
 
 export default function Home() {
-  const { loadRateHistory, loadGoals, loadMatches, currentSummoner, currentLeagueEntry, setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, addRateHistory } = useAppStore();
+  const { loadRateHistory, loadGoals, loadMatches, currentSummoner, currentLeagueEntry, setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, addRateHistory, addMatch } = useAppStore();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [isApiKeyExpanded, setIsApiKeyExpanded] = useState(false);
   const [riotId, setRiotId] = useState<string>('');
@@ -291,6 +291,82 @@ export default function Home() {
         }
       } catch (error) {
         logger.warn('[Update] Failed to fetch rate history:', error);
+      }
+
+      // 4. Fetch and update match details
+      try {
+        // 既存の試合データを読み込んで、既存のmatchIdを取得
+        await loadMatches();
+        const existingMatches = useAppStore.getState().matches;
+        const existingMatchIds = new Set(
+          existingMatches.map(m => m.matchId).filter((id): id is string => !!id)
+        );
+
+        logger.debug(`[Update] Found ${existingMatchIds.size} existing matches in database`);
+
+        // マッチIDを取得
+        const { RiotApiClient } = await import('@/lib/riot/client');
+        const client = new RiotApiClient(apiKey, region);
+        const allMatchIds = await client.getAllRankedMatchIds(currentSummoner.puuid, 20);
+        
+        if (allMatchIds.length === 0) {
+          logger.debug('[Update] No match IDs found');
+        } else {
+          // 既存のmatchIdを除外
+          const newMatchIds = allMatchIds.filter(matchId => !existingMatchIds.has(matchId));
+          
+          if (newMatchIds.length === 0) {
+            logger.info('[Update] All matches already exist in database, skipping fetch');
+          } else {
+            logger.debug(`[Update] Fetching ${newMatchIds.length} new match details (${allMatchIds.length - newMatchIds.length} already exist)`);
+
+            // 新しいmatchIdだけを詳細取得
+            const matchDetailsResponse = await fetch(API_ENDPOINTS.RIOT.FETCH_MATCH_DETAILS, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                puuid: currentSummoner.puuid,
+                region: region,
+                apiKey: apiKey,
+                matchIds: newMatchIds, // 既存でないmatchIdのみを指定
+              }),
+            });
+
+            if (matchDetailsResponse.ok) {
+              const result = await matchDetailsResponse.json();
+              
+              if (result.matches && Array.isArray(result.matches)) {
+                let addedCount = 0;
+                let failedCount = 0;
+
+                for (const matchData of result.matches) {
+                  try {
+                    // 日付をDateオブジェクトに変換
+                    const match: Omit<Match, 'id'> = {
+                      ...matchData,
+                      date: new Date(matchData.date),
+                    };
+
+                    await addMatch(match);
+                    addedCount++;
+                  } catch (error) {
+                    logger.error('[Update] Failed to add match:', error);
+                    failedCount++;
+                  }
+                }
+
+                // データを再読み込み
+                await loadMatches();
+
+                logger.info(`[Update] Match details updated: ${addedCount} added, ${failedCount} failed, ${allMatchIds.length - newMatchIds.length} already existed`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn('[Update] Failed to fetch match details:', error);
       }
 
       alert('データを更新しました');

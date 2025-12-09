@@ -4,15 +4,11 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { Match } from '@/types';
 import { rateMatch, getRatingColor, getRatingBgColor, MatchRatingResult } from '@/lib/analytics/matchRating';
-import { API_ENDPOINTS } from '@/lib/constants';
-import { StorageService } from '@/lib/utils/storage';
-import { logger } from '@/lib/utils/logger';
 
 export default function MatchDetailsPanel() {
-  const { matches, loadMatches, addMatch, currentSummoner, setLoading, setError } = useAppStore();
+  const { matches, loadMatches } = useAppStore();
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [matchRatings, setMatchRatings] = useState<Map<number, MatchRatingResult>>(new Map());
-  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
     loadMatches();
@@ -44,124 +40,15 @@ export default function MatchDetailsPanel() {
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
 
-  const handleFetchMatchDetails = async () => {
-    if (!currentSummoner) {
-      alert('サマナーを選択してください');
-      return;
-    }
-
-    const apiKey = StorageService.getApiKey();
-    if (!apiKey) {
-      alert('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
-      return;
-    }
-
-    setIsFetching(true);
-    setLoading(true);
-    setError(null);
-
-    try {
-      const region = StorageService.getApiRegion() || 'jp1';
-      
-      logger.debug('[MatchDetailsPanel] Fetching match details for puuid:', currentSummoner.puuid);
-      
-      const response = await fetch(API_ENDPOINTS.RIOT.FETCH_MATCH_DETAILS, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          puuid: currentSummoner.puuid,
-          region: currentSummoner.region || region,
-          apiKey,
-          maxMatches: 20,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '試合詳細の取得に失敗しました');
-      }
-
-      const result = await response.json();
-      logger.debug('[MatchDetailsPanel] Match details fetched:', result);
-
-      if (result.matches && result.matches.length > 0) {
-        // 既存の試合データを確認して、重複を避けながら保存
-        await loadMatches(); // 既存データを読み込み
-        const existingMatches = useAppStore.getState().matches;
-        const existingMatchIds = new Set(
-          existingMatches.map(m => m.matchId).filter((id): id is string => !!id)
-        );
-
-        let addedCount = 0;
-        let skippedCount = 0;
-
-        for (const matchData of result.matches) {
-          // matchIdで重複チェック
-          if (matchData.matchId && existingMatchIds.has(matchData.matchId)) {
-            skippedCount++;
-            continue;
-          }
-
-          try {
-            // 日付をDateオブジェクトに変換
-            const match: Omit<Match, 'id'> = {
-              ...matchData,
-              date: new Date(matchData.date),
-            };
-
-            await addMatch(match);
-            if (matchData.matchId) {
-              existingMatchIds.add(matchData.matchId);
-            }
-            addedCount++;
-          } catch (error) {
-            logger.error('[MatchDetailsPanel] Error saving match:', error);
-          }
-        }
-
-        // データを再読み込み
-        await loadMatches();
-
-        alert(`試合データを取得しました: ${addedCount}件追加${skippedCount > 0 ? `, ${skippedCount}件スキップ（既存）` : ''}`);
-      } else {
-        alert('試合データが見つかりませんでした');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '試合詳細の取得に失敗しました';
-      logger.error('[MatchDetailsPanel] Error fetching match details:', error);
-      setError(errorMessage);
-      alert(errorMessage);
-    } finally {
-      setIsFetching(false);
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">試合詳細</h2>
-        {currentSummoner && (
-          <button
-            onClick={handleFetchMatchDetails}
-            disabled={isFetching}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isFetching ? '取得中...' : '試合データを取得'}
-          </button>
-        )}
-      </div>
+      <h2 className="text-2xl font-bold mb-4">試合詳細</h2>
 
       {recentMatches.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">試合データがありません</p>
-          {currentSummoner ? (
-            <p className="text-sm text-gray-400">「試合データを取得」ボタンをクリックしてデータを取得してください</p>
-          ) : (
-            <p className="text-sm text-gray-400">サマナーを選択してください</p>
-          )}
+          <p className="text-sm text-gray-400">サマナーを検索またはUpdateボタンでデータを取得してください</p>
         </div>
       ) : (
         <>

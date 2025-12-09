@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { Summoner, LeagueEntry } from '@/types';
+import { Summoner, LeagueEntry, Match } from '@/types';
 import { API_ENDPOINTS, DEFAULTS } from '@/lib/constants';
 import { extractLeagueEntry } from '@/lib/utils/leagueEntry';
 import { StorageService } from '@/lib/utils/storage';
@@ -137,6 +137,99 @@ export function useSummonerSearch(
       logger.warn('[SummonerSearch] Error fetching rate history, but continuing:', error);
     }
   }, [setCurrentLeagueEntry]);
+
+  const fetchAndSaveMatchDetails = useCallback(async (puuid: string, region: string, apiKey: string | null) => {
+    try {
+      if (!apiKey) {
+        logger.warn('[SummonerSearch] API key not available for match details fetch');
+        return;
+      }
+
+      // 既存の試合データを読み込んで、既存のmatchIdを取得
+      const { loadMatches } = useAppStore.getState();
+      await loadMatches();
+      const existingMatches = useAppStore.getState().matches;
+      const existingMatchIds = new Set(
+        existingMatches.map(m => m.matchId).filter((id): id is string => !!id)
+      );
+
+      logger.debug(`[SummonerSearch] Found ${existingMatchIds.size} existing matches in database`);
+
+      // マッチIDを取得
+      const { RiotApiClient } = await import('@/lib/riot/client');
+      const client = new RiotApiClient(apiKey, region);
+      const allMatchIds = await client.getAllRankedMatchIds(puuid, 20);
+      
+      if (allMatchIds.length === 0) {
+        logger.debug('[SummonerSearch] No match IDs found');
+        return;
+      }
+
+      // 既存のmatchIdを除外
+      const newMatchIds = allMatchIds.filter(matchId => !existingMatchIds.has(matchId));
+      
+      if (newMatchIds.length === 0) {
+        logger.info('[SummonerSearch] All matches already exist in database, skipping fetch');
+        return;
+      }
+
+      logger.debug(`[SummonerSearch] Fetching ${newMatchIds.length} new match details (${allMatchIds.length - newMatchIds.length} already exist)`);
+
+      // 新しいmatchIdだけを詳細取得
+      const response = await fetch(API_ENDPOINTS.RIOT.FETCH_MATCH_DETAILS, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          puuid,
+          region,
+          apiKey,
+          matchIds: newMatchIds, // 既存でないmatchIdのみを指定
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        const errorMessage = error.error || '試合詳細の取得に失敗しました';
+        logger.warn('[SummonerSearch] Failed to fetch match details:', errorMessage);
+        return;
+      }
+
+      const result = await response.json();
+      logger.debug('[SummonerSearch] Match details fetched:', result);
+
+      // Save match details to database
+      if (result.matches && result.matches.length > 0) {
+        const { addMatch } = useAppStore.getState();
+        let addedCount = 0;
+        let failedCount = 0;
+
+        for (const matchData of result.matches) {
+          try {
+            // 日付をDateオブジェクトに変換
+            const match: Omit<Match, 'id'> = {
+              ...matchData,
+              date: new Date(matchData.date),
+            };
+
+            await addMatch(match);
+            addedCount++;
+          } catch (error) {
+            logger.error('[SummonerSearch] Error saving match:', error);
+            failedCount++;
+          }
+        }
+
+        // データを再読み込み
+        await loadMatches();
+
+        logger.info(`[SummonerSearch] Match details saved: ${addedCount} added, ${failedCount} failed, ${allMatchIds.length - newMatchIds.length} already existed`);
+      }
+    } catch (error) {
+      logger.warn('[SummonerSearch] Error fetching match details, but continuing:', error);
+    }
+  }, []);
 
   const search = useCallback(async (riotId: string, region: string) => {
     // Parse Riot ID (gameName#tagLine)
@@ -299,6 +392,9 @@ export function useSummonerSearch(
         // Automatically fetch rate history from match history
         await fetchAndSaveRateHistory(summoner.puuid, currentRegion, apiKey);
         
+        // Automatically fetch match details
+        await fetchAndSaveMatchDetails(summoner.puuid, currentRegion, apiKey);
+        
         // Call success callback
         if (onSuccess) {
           onSuccess();
@@ -325,7 +421,7 @@ export function useSummonerSearch(
       setIsSearching(false);
       setLoading(false);
     }
-  }, [setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, fetchAndSaveRateHistory, onSuccess]);
+  }, [setCurrentSummoner, setCurrentLeagueEntry, setLoading, setError, fetchAndSaveRateHistory, fetchAndSaveMatchDetails, onSuccess]);
 
   return { isSearching, search };
 }
