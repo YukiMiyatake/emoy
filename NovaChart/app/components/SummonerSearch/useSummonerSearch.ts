@@ -106,7 +106,7 @@ export function useSummonerSearch(
       // setCurrentLeagueEntry will also validate that it's solo queue.
       const currentState = useAppStore.getState();
       if (result.currentEntry && !currentState.currentLeagueEntry) {
-        setCurrentLeagueEntry({
+        const entry: LeagueEntry = {
           leagueId: '',
           queueType: DEFAULTS.QUEUE_TYPE, // Explicitly set to RANKED_SOLO_5x5
           tier: result.currentEntry.tier,
@@ -118,7 +118,18 @@ export function useSummonerSearch(
           inactive: false,
           freshBlood: false,
           hotStreak: false,
-        });
+        };
+        setCurrentLeagueEntry(entry); // This will validate it's solo queue
+        
+        // Save to database (solo queue only)
+        try {
+          const { leagueEntryService } = await import('@/lib/db');
+          await leagueEntryService.addOrUpdate(puuid, entry);
+          logger.info('[SummonerSearch] Saved solo queue league entry from rate history to database');
+        } catch (dbError) {
+          logger.error('[SummonerSearch] Failed to save league entry from rate history to database:', dbError);
+          // Don't throw - we still have the entry in memory
+        }
       }
 
       logger.info(`[SummonerSearch] Rate history fetched and saved: ${result.rateHistory?.length || 0} entries`);
@@ -225,6 +236,7 @@ export function useSummonerSearch(
         // This mistake has been made multiple times. DO NOT forget to:
         // 1. Specify queueType=RANKED_SOLO_5x5 in the API call
         // 2. Check that the returned entry is solo queue before setting it
+        // 3. Save to database after validation
         try {
           // ⚠️ MUST specify queueType parameter explicitly - DO NOT rely on defaults
           const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(summoner.puuid)}&region=${currentRegion}&queueType=${DEFAULTS.QUEUE_TYPE}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`);
@@ -237,9 +249,35 @@ export function useSummonerSearch(
               // DO NOT set flex queue or any other queue type entry.
               if (entry.queueType === 'RANKED_SOLO_5x5') {
                 setCurrentLeagueEntry(entry);
+                
+                // Save to database (solo queue only)
+                try {
+                  const { leagueEntryService } = await import('@/lib/db');
+                  await leagueEntryService.addOrUpdate(summoner.puuid, entry);
+                  logger.info('[SummonerSearch] Saved solo queue league entry to database');
+                } catch (dbError) {
+                  logger.error('[SummonerSearch] Failed to save league entry to database:', dbError);
+                  // Don't throw - we still have the entry in memory
+                }
               } else {
                 logger.warn('[SummonerSearch] Received non-solo queue entry, ignoring:', entry.queueType);
                 // DO NOT set the entry - reject it
+                // Also clear any existing non-solo queue entry from database
+                try {
+                  const { leagueEntryService } = await import('@/lib/db');
+                  await leagueEntryService.delete(summoner.puuid);
+                } catch (dbError) {
+                  logger.error('[SummonerSearch] Failed to delete non-solo queue entry from database:', dbError);
+                }
+              }
+            } else {
+              // No entry found - clear from database
+              try {
+                const { leagueEntryService } = await import('@/lib/db');
+                await leagueEntryService.delete(summoner.puuid);
+                setCurrentLeagueEntry(null);
+              } catch (dbError) {
+                logger.error('[SummonerSearch] Failed to delete league entry from database:', dbError);
               }
             }
           }

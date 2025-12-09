@@ -1,11 +1,12 @@
 import Dexie, { Table } from 'dexie';
-import { RateHistory, Goal, Match, Summoner } from '@/types';
+import { RateHistory, Goal, Match, Summoner, LeagueEntry } from '@/types';
 
 export class NovaChartDB extends Dexie {
   rateHistory!: Table<RateHistory, number>;
   goals!: Table<Goal, number>;
   matches!: Table<Match, number>;
   summoners!: Table<Summoner, string>;
+  leagueEntries!: Table<LeagueEntry & { puuid: string; lastUpdated: Date }, string>; // puuid as primary key
 
   constructor() {
     // Use a new database name to avoid primary key migration issues
@@ -19,6 +20,15 @@ export class NovaChartDB extends Dexie {
       goals: '++id, targetDate, createdAt, isActive',
       matches: '++id, date, win, role, champion',
       summoners: '&puuid, id, name, region, lastUpdated', // &puuid = unique primary key
+    });
+    
+    // Version 2: Add leagueEntries table
+    this.version(2).stores({
+      rateHistory: '++id, date, tier, rank, lp',
+      goals: '++id, targetDate, createdAt, isActive',
+      matches: '++id, date, win, role, champion',
+      summoners: '&puuid, id, name, region, lastUpdated',
+      leagueEntries: '&puuid, queueType, lastUpdated', // &puuid = unique primary key, only solo queue entries
     });
   }
 }
@@ -165,6 +175,60 @@ export const summonerService = {
 
   async delete(puuid: string): Promise<void> {
     return await db.summoners.delete(puuid);
+  },
+};
+
+// ⚠️ CRITICAL: League entry service - ONLY stores RANKED_SOLO_5x5 (solo queue) entries
+// This mistake has been made multiple times. DO NOT store any other queue types.
+export const leagueEntryService = {
+  /**
+   * Get league entry by PUUID (solo queue only)
+   * ⚠️ CRITICAL: Only returns solo queue entries. Non-solo queue entries are rejected.
+   */
+  async getByPuuid(puuid: string): Promise<(LeagueEntry & { puuid: string; lastUpdated: Date }) | undefined> {
+    const entry = await db.leagueEntries.get(puuid);
+    // Double-check it's solo queue (safety check)
+    if (entry && entry.queueType !== 'RANKED_SOLO_5x5') {
+      console.warn('[LeagueEntryService] Found non-solo queue entry in database, deleting:', entry.queueType);
+      await db.leagueEntries.delete(puuid);
+      return undefined;
+    }
+    return entry;
+  },
+
+  /**
+   * Add or update league entry (solo queue only)
+   * ⚠️ CRITICAL: Only accepts RANKED_SOLO_5x5 entries. Rejects all other queue types.
+   */
+  async addOrUpdate(puuid: string, entry: LeagueEntry): Promise<string> {
+    // ⚠️ CRITICAL: Only allow solo queue entries
+    if (entry.queueType !== 'RANKED_SOLO_5x5') {
+      throw new Error(`Cannot save non-solo queue entry. Queue type: ${entry.queueType}. Only RANKED_SOLO_5x5 is allowed.`);
+    }
+    
+    if (!puuid || puuid.trim() === '') {
+      throw new Error('PUUID is required');
+    }
+    
+    return await db.leagueEntries.put({
+      ...entry,
+      puuid,
+      lastUpdated: new Date(),
+    });
+  },
+
+  /**
+   * Delete league entry by PUUID
+   */
+  async delete(puuid: string): Promise<void> {
+    return await db.leagueEntries.delete(puuid);
+  },
+
+  /**
+   * Delete all league entries
+   */
+  async deleteAll(): Promise<void> {
+    return await db.leagueEntries.clear();
   },
 };
 

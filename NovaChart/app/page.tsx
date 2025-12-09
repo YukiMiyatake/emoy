@@ -26,7 +26,7 @@ export default function Home() {
     loadGoals();
     loadMatches();
     
-    // Load saved summoner from database
+    // Load saved summoner from database and fetch solo queue league entry
     const loadSavedSummoner = async () => {
       try {
         const { summonerService } = await import('@/lib/db');
@@ -37,6 +37,65 @@ export default function Home() {
             new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
           )[0];
           setCurrentSummoner(latestSummoner);
+          
+          // ⚠️ CRITICAL: Load solo queue league entry on startup
+          // First try to load from database, then fetch from API if not available
+          // This ensures we always have solo queue data, not cached flex queue data
+          try {
+            // Try to load from database first
+            const { leagueEntryService } = await import('@/lib/db');
+            const savedEntry = await leagueEntryService.getByPuuid(latestSummoner.puuid);
+            
+            if (savedEntry && savedEntry.queueType === 'RANKED_SOLO_5x5') {
+              // Use saved entry (already validated as solo queue by getByPuuid)
+              setCurrentLeagueEntry(savedEntry);
+              logger.info('[Home] Loaded solo queue league entry from database on startup');
+            } else {
+              // No valid entry in database, fetch from API
+              const apiKey = StorageService.getApiKey();
+              const region = latestSummoner.region || StorageService.getApiRegion() || 'jp1';
+              
+              if (apiKey) {
+                // Fetch solo queue league entry
+                const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(latestSummoner.puuid)}&region=${region}&queueType=${DEFAULTS.QUEUE_TYPE}&apiKey=${encodeURIComponent(apiKey)}`);
+                if (leagueResponse.ok) {
+                  const leagueData = await leagueResponse.json();
+                  if (leagueData.entry) {
+                    const entry = extractLeagueEntry(leagueData.entry);
+                    // ⚠️ CRITICAL: Only set if it's solo queue (RANKED_SOLO_5x5)
+                    // This check has been missing multiple times. DO NOT REMOVE THIS CHECK.
+                    if (entry.queueType === 'RANKED_SOLO_5x5') {
+                      setCurrentLeagueEntry(entry);
+                      // Save to database
+                      await leagueEntryService.addOrUpdate(latestSummoner.puuid, entry);
+                      logger.info('[Home] Fetched and saved solo queue league entry on startup');
+                    } else {
+                      logger.warn('[Home] Received non-solo queue entry on startup, ignoring:', entry.queueType);
+                      // Clear any non-solo queue entry
+                      setCurrentLeagueEntry(null);
+                      await leagueEntryService.delete(latestSummoner.puuid);
+                    }
+                  } else {
+                    // No league entry found - clear it
+                    setCurrentLeagueEntry(null);
+                    await leagueEntryService.delete(latestSummoner.puuid);
+                  }
+                } else {
+                  logger.warn('[Home] Failed to fetch league entry on startup');
+                  // Clear any cached entry
+                  setCurrentLeagueEntry(null);
+                }
+              } else {
+                logger.warn('[Home] API key not available, cannot fetch league entry on startup');
+                // Clear any cached entry
+                setCurrentLeagueEntry(null);
+              }
+            }
+          } catch (error) {
+            logger.error('[Home] Error loading league entry on startup:', error);
+            // Clear any cached entry on error
+            setCurrentLeagueEntry(null);
+          }
         }
       } catch (error) {
         logger.error('[Home] Failed to load saved summoner:', error);
@@ -44,7 +103,7 @@ export default function Home() {
     };
     
     loadSavedSummoner();
-  }, [loadRateHistory, loadGoals, loadMatches, setCurrentSummoner]);
+  }, [loadRateHistory, loadGoals, loadMatches, setCurrentSummoner, setCurrentLeagueEntry]);
 
   useEffect(() => {
     // Load Riot ID from localStorage
@@ -117,6 +176,7 @@ export default function Home() {
       // This mistake has been made multiple times. DO NOT forget to:
       // 1. Specify queueType=RANKED_SOLO_5x5 in the API call
       // 2. Check that the returned entry is solo queue before setting it
+      // 3. Save to database after validation
       try {
         // ⚠️ MUST specify queueType parameter explicitly - DO NOT rely on defaults
         const leagueResponse = await fetch(`${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(currentSummoner.puuid)}&region=${region}&queueType=${DEFAULTS.QUEUE_TYPE}&apiKey=${encodeURIComponent(apiKey)}`);
@@ -129,9 +189,35 @@ export default function Home() {
             // DO NOT set flex queue or any other queue type entry.
             if (entry.queueType === 'RANKED_SOLO_5x5') {
               setCurrentLeagueEntry(entry);
+              
+              // Save to database (solo queue only)
+              try {
+                const { leagueEntryService } = await import('@/lib/db');
+                await leagueEntryService.addOrUpdate(currentSummoner.puuid, entry);
+                logger.info('[Update] Saved solo queue league entry to database');
+              } catch (dbError) {
+                logger.error('[Update] Failed to save league entry to database:', dbError);
+                // Don't throw - we still have the entry in memory
+              }
             } else {
               logger.warn('[Update] Received non-solo queue entry, ignoring:', entry.queueType);
               // DO NOT set the entry - reject it
+              // Also clear any existing non-solo queue entry from database
+              try {
+                const { leagueEntryService } = await import('@/lib/db');
+                await leagueEntryService.delete(currentSummoner.puuid);
+              } catch (dbError) {
+                logger.error('[Update] Failed to delete non-solo queue entry from database:', dbError);
+              }
+            }
+          } else {
+            // No entry found - clear from database
+            try {
+              const { leagueEntryService } = await import('@/lib/db');
+              await leagueEntryService.delete(currentSummoner.puuid);
+              setCurrentLeagueEntry(null);
+            } catch (dbError) {
+              logger.error('[Update] Failed to delete league entry from database:', dbError);
             }
           }
         }
