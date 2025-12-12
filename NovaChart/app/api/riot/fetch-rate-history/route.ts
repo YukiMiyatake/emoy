@@ -79,15 +79,11 @@ export async function POST(request: NextRequest) {
       losses: number;
     }> = [];
 
-    // Add current rate as the latest entry
-    rateHistory.push({
-      date: new Date().toISOString(),
-      tier: currentEntry.tier,
-      rank: currentEntry.rank,
-      lp: currentEntry.leaguePoints,
-      wins: currentEntry.wins,
-      losses: currentEntry.losses,
-    });
+    // ⚠️ CRITICAL: Do NOT add current rate as an entry
+    // The current rate is not based on match history, so it should not be saved to database
+    // It can only be used for display (plotting) purposes in the chart
+    // Only entries based on actual match history should be included
+    console.log('[Fetch Rate History] Skipping current date entry - not based on match history');
 
     // Process matches in reverse chronological order (newest first)
     // We'll work backwards from current LP to estimate past LP
@@ -144,6 +140,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: 'Rate history fetched from match history',
       rateHistory,
+      // ⚠️ CRITICAL: currentEntry is provided for display purposes only (plotting)
+      // It should NOT be saved to database as it's not based on match history
       currentEntry: {
         tier: currentEntry.tier,
         rank: currentEntry.rank,
