@@ -84,9 +84,6 @@ export function useSummonerSearch(
             // ⚠️ CRITICAL: Skip entries for today or future dates
             // These are not based on match history and should not be saved
             if (entryDateOnlyTime >= todayTime) {
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:85',message:'Skipping entry - not based on match history',data:{entryDate:entry.date,entryDateOnlyTime,todayTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-              // #endregion
               skippedCount++;
               logger.debug('[SummonerSearch] Skipping entry - not based on match history:', entry.date);
               continue;
@@ -94,10 +91,6 @@ export function useSummonerSearch(
             
             const dateKey = getDateKey(entryDate);
             const existedBefore = existingByDate.has(dateKey);
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:95',message:'Saving rate history entry',data:{entryDate:entry.date,existedBefore},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             
             await addRateHistory({
               date: entryDate,
@@ -125,9 +118,6 @@ export function useSummonerSearch(
         }
         
         logger.info(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed, ${skippedCount} skipped (not based on match history)`);
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:120',message:'Rate history save summary',data:{addedCount,updatedCount,failedCount,skippedCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       }
 
       // ⚠️ CRITICAL: Update current league entry if not already set
