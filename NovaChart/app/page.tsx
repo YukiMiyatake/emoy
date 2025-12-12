@@ -253,11 +253,30 @@ export default function Home() {
           if (result.rateHistory && Array.isArray(result.rateHistory)) {
             let successCount = 0;
             let failedCount = 0;
+            let skippedCount = 0;
+            
+            // Get today's date for comparison
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTime = today.getTime();
             
             for (const entry of result.rateHistory) {
               try {
+                const entryDate = new Date(entry.date);
+                const entryDateOnly = new Date(entryDate);
+                entryDateOnly.setHours(0, 0, 0, 0);
+                const entryDateOnlyTime = entryDateOnly.getTime();
+                
+                // ⚠️ CRITICAL: Skip entries for today or future dates
+                // These are not based on match history and should not be saved
+                if (entryDateOnlyTime >= todayTime) {
+                  skippedCount++;
+                  logger.debug('[Update] Skipping entry - not based on match history:', entry.date);
+                  continue;
+                }
+                
                 await addRateHistory({
-                  date: new Date(entry.date),
+                  date: entryDate,
                   tier: entry.tier,
                   rank: entry.rank,
                   lp: entry.lp,
@@ -271,7 +290,7 @@ export default function Home() {
               }
             }
             
-            logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed`);
+            logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed, ${skippedCount} skipped (not based on match history)`);
           }
 
           // ⚠️ CRITICAL: Update league entry if available
