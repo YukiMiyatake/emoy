@@ -32,6 +32,7 @@ describe('useChartData', () => {
     rank: string = 'IV',
     lp: number = 0
   ): RateHistory => ({
+    matchId: `TEST_MATCH_${date.getTime()}`,
     date,
     tier,
     rank,

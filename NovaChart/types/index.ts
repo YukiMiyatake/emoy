@@ -1,5 +1,5 @@
 export interface RateHistory {
-  id?: number;
+  matchId: string;   // Riot APIのマッチID（プライマリキー）
   date: Date;
   tier: string;      // IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER, GRANDMASTER, CHALLENGER
   rank: string;      // IV, III, II, I
@@ -19,7 +19,7 @@ export interface Goal {
 }
 
 export interface Match {
-  id?: number;
+  matchId: string;   // Riot APIのマッチID（プライマリキー）
   date: Date;
   win: boolean;
   role?: string;
@@ -37,7 +37,6 @@ export interface Match {
   damageToChampions?: number; // チャンピオンへのダメージ
   goldEarned?: number; // 獲得ゴールド
   csPerMin?: number; // 分あたりのCS
-  matchId?: string; // Riot APIのマッチID
   gameDuration?: number; // 試合時間（秒）
   totalMinionsKilled?: number; // 総ミニオンキル数
   neutralMinionsKilled?: number; // ジャングルミニオンキル数

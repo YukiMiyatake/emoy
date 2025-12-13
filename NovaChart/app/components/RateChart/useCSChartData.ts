@@ -68,7 +68,15 @@ export function useCSChartData(
 
     // 移動平均を計算
     const csValues = dataPoints.map(d => d.csPerMin);
-    const movingAvg = calculateMovingAverage(csValues, movingAverageWindow);
+    // Calculate moving average manually for number array
+    const movingAvg: number[] = [];
+    for (let i = 0; i < csValues.length; i++) {
+      const start = Math.max(0, i - movingAverageWindow + 1);
+      const window = csValues.slice(start, i + 1);
+      const sum = window.reduce((acc, val) => acc + (isNaN(val) ? 0 : val), 0);
+      const count = window.filter(val => !isNaN(val)).length;
+      movingAvg.push(count > 0 ? sum / count : NaN);
+    }
     movingAvg.forEach((avg, index) => {
       if (dataPoints[index]) {
         dataPoints[index].movingAverage = avg;

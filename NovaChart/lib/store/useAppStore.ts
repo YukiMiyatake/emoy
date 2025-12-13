@@ -39,14 +39,14 @@ interface AppState {
 
   // Actions
   loadRateHistory: () => Promise<void>;
-  addRateHistory: (rate: Omit<RateHistory, 'id'>) => Promise<void>;
+  addRateHistory: (rate: RateHistory) => Promise<void>;
   clearRateHistory: () => Promise<void>;
   loadGoals: () => Promise<void>;
   addGoal: (goal: Omit<Goal, 'id'>) => Promise<void>;
   updateGoal: (id: number, changes: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: number) => Promise<void>;
   loadMatches: () => Promise<void>;
-  addMatch: (match: Omit<Match, 'id'>) => Promise<void>;
+  addMatch: (match: Match) => Promise<void>;
   loadSkillGoals: () => Promise<void>;
   addSkillGoal: (goal: Omit<SkillGoal, 'id'>) => Promise<void>;
   updateSkillGoal: (id: number, changes: Partial<SkillGoal>) => Promise<void>;
@@ -93,9 +93,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadRateHistory: async () => {
     try {
       set({ isLoading: true, error: null });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:93',message:'loadRateHistory called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       const history = await rateHistoryService.getAll();
-      set({ rateHistory: history, isLoading: false });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:97',message:'loadRateHistory success',data:{count:history.length,firstEntry:history[0]?{matchId:history[0].matchId,date:history[0].date,dateType:typeof history[0].date}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      // Ensure dates are Date objects
+      const normalizedHistory = history.map(entry => ({
+        ...entry,
+        date: entry.date instanceof Date ? entry.date : new Date(entry.date)
+      }));
+      set({ rateHistory: normalizedHistory, isLoading: false });
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:105',message:'loadRateHistory error',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      console.error('[useAppStore] loadRateHistory error:', error);
       handleStoreError(set, error, 'Failed to load rate history');
     }
   },
@@ -103,10 +118,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   addRateHistory: async (rate) => {
     try {
       set({ isLoading: true, error: null });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:107',message:'addRateHistory called',data:{matchId:rate.matchId,date:rate.date,dateType:typeof rate.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      // Ensure date is a Date object
+      const normalizedRate = {
+        ...rate,
+        date: rate.date instanceof Date ? rate.date : new Date(rate.date)
+      };
       // add() method now handles duplicate checking internally
-      await rateHistoryService.add(rate);
+      await rateHistoryService.add(normalizedRate);
       await get().loadRateHistory();
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:115',message:'addRateHistory success',data:{matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:118',message:'addRateHistory error',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined,matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      console.error('[useAppStore] addRateHistory error:', error);
       handleStoreError(set, error, 'Failed to add rate history');
     }
   },

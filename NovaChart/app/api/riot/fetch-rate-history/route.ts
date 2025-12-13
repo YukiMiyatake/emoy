@@ -55,13 +55,14 @@ export async function POST(request: NextRequest) {
 
     // Fetch match details (limited to avoid rate limits)
     const matchesToFetch = Math.min(matchIds.length, 20); // Limit to 20 matches for now
-    const matchDetails: any[] = [];
+    const matchDetails: Array<{ match: any; matchId: string }> = [];
 
     for (let i = 0; i < matchesToFetch; i++) {
       try {
         const match = await client.getMatchByMatchId(matchIds[i]);
-        matchDetails.push(match);
-        console.log(`[Fetch Rate History] Fetched match ${i + 1}/${matchesToFetch}:`, matchIds[i]);
+        const matchId = match.metadata?.matchId || matchIds[i];
+        matchDetails.push({ match, matchId });
+        console.log(`[Fetch Rate History] Fetched match ${i + 1}/${matchesToFetch}:`, matchId);
       } catch (error) {
         console.error(`[Fetch Rate History] Error fetching match ${matchIds[i]}:`, error);
         // Continue with other matches
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
     // Process matches to extract rate information
     // Note: Match history doesn't directly contain LP changes, so we can only estimate
     const rateHistory: Array<{
+      matchId: string;
       date: string;
       tier: string;
       rank: string;
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[Fetch Rate History] Starting from total LP:', estimatedTotalLP, `(${currentEntry.tier} ${currentEntry.rank} ${currentEntry.leaguePoints} LP)`);
 
-    for (const match of matchDetails) {
+    for (const { match, matchId } of matchDetails) {
       // Find the player in the match
       const participant = match.info.participants.find((p: any) => p.puuid === puuid);
       if (!participant) continue;
@@ -120,9 +122,15 @@ export async function POST(request: NextRequest) {
       // Convert total LP back to tier/rank/lp using the utility function
       const tierRankLP = lpToTierRank(estimatedTotalLP);
 
-      console.log(`[Fetch Rate History] Match ${matchDate.toISOString()}: ${won ? 'Win' : 'Loss'}, Total LP: ${estimatedTotalLP}, Tier: ${tierRankLP.tier}, Rank: ${tierRankLP.rank}, LP: ${tierRankLP.lp}`);
+      console.log(`[Fetch Rate History] Match ${matchDate.toISOString()}: ${won ? 'Win' : 'Loss'}, Total LP: ${estimatedTotalLP}, Tier: ${tierRankLP.tier}, Rank: ${tierRankLP.rank}, LP: ${tierRankLP.lp}, MatchId: ${matchId}`);
+
+      if (!matchId) {
+        console.warn('[Fetch Rate History] Match ID not found, skipping entry');
+        continue;
+      }
 
       rateHistory.push({
+        matchId,
         date: matchDate.toISOString(),
         tier: tierRankLP.tier,
         rank: tierRankLP.rank,

@@ -8,7 +8,7 @@ import { rateMatch, getRatingColor, getRatingBgColor, MatchRatingResult } from '
 export default function MatchDetailsPanel() {
   const { matches, loadMatches } = useAppStore();
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-  const [matchRatings, setMatchRatings] = useState<Map<number, MatchRatingResult>>(new Map());
+  const [matchRatings, setMatchRatings] = useState<Map<string, MatchRatingResult>>(new Map());
   const [isDeleting, setIsDeleting] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -19,10 +19,10 @@ export default function MatchDetailsPanel() {
 
   useEffect(() => {
     // 各試合の評価を計算
-    const ratings = new Map<number, MatchRatingResult>();
+    const ratings = new Map<string, MatchRatingResult>();
     matches.forEach(match => {
-      if (match.id !== undefined) {
-        ratings.set(match.id, rateMatch(match, match.lane));
+      if (match.matchId) {
+        ratings.set(match.matchId, rateMatch(match, match.lane));
       }
     });
     setMatchRatings(ratings);
@@ -153,7 +153,7 @@ export default function MatchDetailsPanel() {
           {/* スクロール可能な試合一覧 */}
           <div className="space-y-3 mb-6 max-h-[600px] overflow-y-auto pr-2">
             {paginatedMatches.map((match) => {
-          const rating = match.id !== undefined ? matchRatings.get(match.id) : null;
+          const rating = match.matchId ? matchRatings.get(match.matchId) : null;
           const kda = match.kda;
           const kdaText = kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : '-';
           const kdaRatio = kda && kda.deaths > 0 
@@ -164,12 +164,12 @@ export default function MatchDetailsPanel() {
 
           return (
             <div
-              key={match.id}
+              key={match.matchId}
               className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
                 match.win
                   ? 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700'
                   : 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700'
-              } ${selectedMatch?.id === match.id ? 'ring-2 ring-blue-500' : ''}`}
+              } ${selectedMatch?.matchId === match.matchId ? 'ring-2 ring-blue-500' : ''}`}
               onClick={() => setSelectedMatch(match)}
             >
               <div className="flex items-center justify-between mb-2">
@@ -272,7 +272,7 @@ export default function MatchDetailsPanel() {
           <h3 className="text-lg font-semibold mb-4">試合詳細情報</h3>
           
           {(() => {
-            const rating = selectedMatch.id !== undefined ? matchRatings.get(selectedMatch.id) : null;
+            const rating = selectedMatch.matchId ? matchRatings.get(selectedMatch.matchId) : null;
             return (
               <div className="space-y-4">
                 {rating && (

@@ -251,6 +251,14 @@ export default function Home() {
           const result = await rateHistoryResponse.json();
           
           if (result.rateHistory && Array.isArray(result.rateHistory)) {
+            const { rateHistoryService } = await import('@/lib/db');
+            const { rateHistory: currentRateHistory } = useAppStore.getState();
+            
+            // Get existing matchIds to avoid re-fetching and re-saving
+            const existingMatchIds = new Set(
+              currentRateHistory.map(r => r.matchId).filter((id): id is string => !!id)
+            );
+            
             let successCount = 0;
             let failedCount = 0;
             let skippedCount = 0;
@@ -262,6 +270,20 @@ export default function Home() {
             
             for (const entry of result.rateHistory) {
               try {
+                // Skip if matchId is missing
+                if (!entry.matchId) {
+                  skippedCount++;
+                  logger.debug('[Update] Skipping entry - missing matchId:', entry.date);
+                  continue;
+                }
+                
+                // Skip if already exists (avoid re-fetching and re-saving)
+                if (existingMatchIds.has(entry.matchId)) {
+                  skippedCount++;
+                  logger.debug('[Update] Skipping entry - already exists:', entry.matchId);
+                  continue;
+                }
+                
                 const entryDate = new Date(entry.date);
                 const entryDateOnly = new Date(entryDate);
                 entryDateOnly.setHours(0, 0, 0, 0);
@@ -276,6 +298,7 @@ export default function Home() {
                 }
                 
                 await addRateHistory({
+                  matchId: entry.matchId,
                   date: entryDate,
                   tier: entry.tier,
                   rank: entry.rank,
@@ -284,33 +307,40 @@ export default function Home() {
                   losses: entry.losses || 0,
                 });
                 successCount++;
+                existingMatchIds.add(entry.matchId);
               } catch (error) {
                 logger.error('[Update] Failed to add rate history entry:', error);
                 failedCount++;
               }
             }
             
-            logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed, ${skippedCount} skipped (not based on match history)`);
+            logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed, ${skippedCount} skipped (${skippedCount - failedCount} already existed or missing matchId)`);
+            
+            // Save the latest entry from rateHistory (most recent match data from API)
+            // This is the actual latest data from match history, not the currentEntry
+            if (result.rateHistory && result.rateHistory.length > 0) {
+              const latestEntry = result.rateHistory[result.rateHistory.length - 1]; // Last entry is the most recent
+              if (latestEntry && latestEntry.matchId) {
+                try {
+                  await addRateHistory({
+                    matchId: latestEntry.matchId,
+                    date: new Date(latestEntry.date),
+                    tier: latestEntry.tier,
+                    rank: latestEntry.rank,
+                    lp: latestEntry.lp,
+                    wins: latestEntry.wins || 0,
+                    losses: latestEntry.losses || 0,
+                  });
+                  logger.info('[Update] Saved latest rateHistory entry (most recent match data)');
+                } catch (error) {
+                  logger.error('[Update] Failed to save latest rateHistory entry:', error);
+                }
+              }
+            }
           }
 
-          // ⚠️ CRITICAL: Save currentEntry (latest LP data) to rateHistory
-          // This is the current LP data from the API, which should be saved to DB
+          // Update league entry for display
           if (result.currentEntry) {
-            try {
-              await addRateHistory({
-                date: new Date(result.currentEntry.date),
-                tier: result.currentEntry.tier,
-                rank: result.currentEntry.rank,
-                lp: result.currentEntry.lp,
-                wins: result.currentEntry.wins || 0,
-                losses: result.currentEntry.losses || 0,
-              });
-              logger.info('[Update] Saved currentEntry (latest LP data) to rateHistory');
-            } catch (error) {
-              logger.error('[Update] Failed to save currentEntry to rateHistory:', error);
-            }
-
-            // Update league entry for display
             const entry: LeagueEntry = {
               leagueId: '',
               queueType: 'RANKED_SOLO_5x5', // Explicitly set to solo queue
@@ -381,9 +411,17 @@ export default function Home() {
 
                 for (const matchData of result.matches) {
                   try {
+                    // Skip if matchId is missing
+                    if (!matchData.matchId) {
+                      logger.warn('[Update] Skipping match - missing matchId:', matchData);
+                      failedCount++;
+                      continue;
+                    }
+
                     // 日付をDateオブジェクトに変換
-                    const match: Omit<Match, 'id'> = {
+                    const match: Match = {
                       ...matchData,
+                      matchId: matchData.matchId,
                       date: new Date(matchData.date),
                     };
 

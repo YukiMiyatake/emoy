@@ -46,7 +46,7 @@ export function useFetchSummoner(
         throw new Error('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
       }
 
-      const response = await fetch(
+      const response = await globalThis.fetch(
         `${API_ENDPOINTS.RIOT.SUMMONER_BY_PUUID}?puuid=${encodeURIComponent(puuid)}&region=${currentRegion}&apiKey=${encodeURIComponent(apiKey)}`
       );
 
@@ -110,7 +110,7 @@ export function useFetchLeagueEntry(
         throw new Error('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
       }
 
-      const response = await fetch(
+      const response = await globalThis.fetch(
         `${API_ENDPOINTS.RIOT.LEAGUE_BY_PUUID}?puuid=${encodeURIComponent(puuid)}&region=${currentRegion}&queueType=${queueType}&apiKey=${encodeURIComponent(apiKey)}`
       );
 
@@ -172,7 +172,7 @@ export function useFetchRateHistory(
         throw new Error('APIキーが必要です。右上の「APIキー設定」からAPIキーを設定してください。');
       }
 
-      const response = await fetch(API_ENDPOINTS.RIOT.FETCH_RATE_HISTORY, {
+      const response = await globalThis.fetch(API_ENDPOINTS.RIOT.FETCH_RATE_HISTORY, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
