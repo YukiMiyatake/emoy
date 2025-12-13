@@ -273,14 +273,19 @@ export default function Home() {
                 // Skip if matchId is missing
                 if (!entry.matchId) {
                   skippedCount++;
-                  logger.debug('[Update] Skipping entry - missing matchId:', entry.date);
                   continue;
                 }
                 
                 // Skip if already exists (avoid re-fetching and re-saving)
                 if (existingMatchIds.has(entry.matchId)) {
                   skippedCount++;
-                  logger.debug('[Update] Skipping entry - already exists:', entry.matchId);
+                  continue;
+                }
+                
+                // ⚠️ CRITICAL: Skip entries with matchId starting with "current-"
+                // These are current entry data for display purposes only and should NOT be saved to database
+                if (entry.matchId && entry.matchId.startsWith('current-')) {
+                  skippedCount++;
                   continue;
                 }
                 
@@ -293,7 +298,6 @@ export default function Home() {
                 // These are not based on match history and should not be saved
                 if (entryDateOnlyTime >= todayTime) {
                   skippedCount++;
-                  logger.debug('[Update] Skipping entry - not based on match history:', entry.date);
                   continue;
                 }
                 
@@ -318,9 +322,10 @@ export default function Home() {
             
             // Save the latest entry from rateHistory (most recent match data from API)
             // This is the actual latest data from match history, not the currentEntry
+            // ⚠️ CRITICAL: Skip entries with matchId starting with "current-" (current entry for display only)
             if (result.rateHistory && result.rateHistory.length > 0) {
               const latestEntry = result.rateHistory[result.rateHistory.length - 1]; // Last entry is the most recent
-              if (latestEntry && latestEntry.matchId) {
+              if (latestEntry && latestEntry.matchId && !latestEntry.matchId.startsWith('current-')) {
                 try {
                   await addRateHistory({
                     matchId: latestEntry.matchId,
@@ -372,24 +377,18 @@ export default function Home() {
           existingMatches.map(m => m.matchId).filter((id): id is string => !!id)
         );
 
-        logger.debug(`[Update] Found ${existingMatchIds.size} existing matches in database`);
-
         // マッチIDを取得
         const { RiotApiClient } = await import('@/lib/riot/client');
         const client = new RiotApiClient(apiKey, region);
         const allMatchIds = await client.getAllRankedMatchIds(currentSummoner.puuid, 20);
         
-        if (allMatchIds.length === 0) {
-          logger.debug('[Update] No match IDs found');
-        } else {
+        if (allMatchIds.length > 0) {
           // 既存のmatchIdを除外
           const newMatchIds = allMatchIds.filter(matchId => !existingMatchIds.has(matchId));
           
           if (newMatchIds.length === 0) {
             logger.info('[Update] All matches already exist in database, skipping fetch');
           } else {
-            logger.debug(`[Update] Fetching ${newMatchIds.length} new match details (${allMatchIds.length - newMatchIds.length} already exist)`);
-
             // 新しいmatchIdだけを詳細取得
             const matchDetailsResponse = await fetch(API_ENDPOINTS.RIOT.FETCH_MATCH_DETAILS, {
               method: 'POST',

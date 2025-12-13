@@ -109,8 +109,9 @@ export default function BaseChartContainer({
             label={chartConfig.yAxisLabel}
           />
           <Tooltip
-            formatter={chartConfig.tooltipFormatter}
-            labelFormatter={(label) => `日付: ${label}`}
+            content={chartConfig.tooltipContent || undefined}
+            formatter={chartConfig.tooltipContent ? undefined : chartConfig.tooltipFormatter}
+            labelFormatter={chartConfig.tooltipContent ? undefined : (label) => `日付: ${label}`}
           />
           <Legend onClick={(e: any) => onLegendClick(e.dataKey)} />
           {allLines.map((lineConfig: LineConfig, index: number) => (
