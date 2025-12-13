@@ -105,9 +105,11 @@ export async function POST(request: NextRequest) {
 
     // Process matches in reverse chronological order (newest first)
     // We'll work backwards from current LP to estimate past LP
-    // The latest match data (excluding current) should have the same LP as currentEntry
-    let isFirstMatch = true;
-    for (const { match, matchId } of sortedMatchDetails) {
+    // N (latest match) LP = C (currentEntry) LP
+    // N-1 LP = N LP - (N match result: Win = -20, Loose = +20)
+    for (let i = 0; i < sortedMatchDetails.length; i++) {
+      const { match, matchId } = sortedMatchDetails[i];
+      
       // Find the player in the match
       const participant = match.info.participants.find((p: any) => p.puuid === puuid);
       if (!participant) continue;
@@ -115,29 +117,16 @@ export async function POST(request: NextRequest) {
       const matchDate = new Date(match.info.gameCreation);
       const won = participant.win;
 
-      // For the first (newest) match, set LP to currentEntry's LP value
+      // For the first (newest) match N, set LP to currentEntry's LP value (C)
       // This ensures the latest data (excluding current) matches LeagueEntries' LP value
-      if (isFirstMatch) {
-        // Set the latest match data to currentEntry's LP value
+      if (i === 0) {
+        // N's LP value = C's LP value
         estimatedTotalLP = tierRankToLP(currentEntry.tier, currentEntry.rank, currentEntry.leaguePoints);
         estimatedWins = currentEntry.wins;
         estimatedLosses = currentEntry.losses;
-        isFirstMatch = false;
       } else {
-        // For subsequent matches, estimate LP change (typically +15 to +25 for win, -15 to -25 for loss)
-        // This is an approximation and may not be accurate
-        // Working backwards, so reverse the change
-        const estimatedLPChange = won ? -20 : 20;
-        estimatedTotalLP += estimatedLPChange;
-
-        // Ensure LP doesn't go below 0
-        estimatedTotalLP = Math.max(0, estimatedTotalLP);
-
-        if (won) {
-          estimatedWins--;
-        } else {
-          estimatedLosses--;
-        }
+        // For subsequent matches, the LP value is already calculated from the previous match's result
+        // No need to recalculate here, just use the current estimatedTotalLP
       }
 
       // Convert total LP back to tier/rank/lp using the utility function
@@ -157,6 +146,19 @@ export async function POST(request: NextRequest) {
         wins: estimatedWins,
         losses: estimatedLosses,
       });
+
+      // After adding N to rateHistory, calculate N-1 based on N's match result
+      // N-1 LP = N LP - (N match result: Win = -20, Loose = +20)
+      // This calculation is done after pushing N, so the next iteration will use N-1's LP value
+      const estimatedLPChange = won ? -20 : 20;
+      estimatedTotalLP += estimatedLPChange;
+      estimatedTotalLP = Math.max(0, estimatedTotalLP);
+
+      if (won) {
+        estimatedWins--;
+      } else {
+        estimatedLosses--;
+      }
     }
 
     // Sort by date (oldest first)
