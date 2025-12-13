@@ -65,9 +65,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process matches to extract rate information
-    // Note: Match history doesn't directly contain LP changes, so we can only estimate
-    const rateHistory: Array<{
+    // Type definition for rate history entry
+    type RateHistoryEntry = {
       matchId: string;
       date: string;
       tier: string;
@@ -75,26 +74,46 @@ export async function POST(request: NextRequest) {
       lp: number;
       wins: number;
       losses: number;
-    }> = [];
+    };
 
-    // Calculate total LP from current tier/rank/lp
-    // We'll work backwards from current LP to estimate past LP
-    let estimatedTotalLP = tierRankToLP(currentEntry.tier, currentEntry.rank, currentEntry.leaguePoints);
-    let estimatedWins = currentEntry.wins;
-    let estimatedLosses = currentEntry.losses;
+    // Helper function to calculate LP change based on match result (working backwards)
+    const calculateLPChange = (won: boolean): number => {
+      // Win: +20 LP gained, so before match = current - 20
+      // Loss: -20 LP lost, so before match = current + 20
+      return won ? -20 : 20;
+    };
 
-    // Add current entry as the first (latest) entry in rate history for display purposes only
+    // Helper function to create rate history entry from LP and stats
+    const createRateHistoryEntry = (
+      matchId: string,
+      date: string,
+      totalLP: number,
+      wins: number,
+      losses: number
+    ): RateHistoryEntry => {
+      const tierRankLP = lpToTierRank(totalLP);
+      return {
+        matchId,
+        date,
+        tier: tierRankLP.tier,
+        rank: tierRankLP.rank,
+        lp: tierRankLP.lp,
+        wins,
+        losses,
+      };
+    };
+
+    // Initialize rate history with current entry (for display purposes only)
     // ⚠️ CRITICAL: This entry has matchId starting with "current-" and should NOT be saved to database
-    // Use a placeholder matchId for current entry since it's not from a match
-    rateHistory.push({
-      matchId: `current-${Date.now()}`,
-      date: new Date().toISOString(),
-      tier: currentEntry.tier,
-      rank: currentEntry.rank,
-      lp: currentEntry.leaguePoints,
-      wins: currentEntry.wins,
-      losses: currentEntry.losses,
-    });
+    const rateHistory: RateHistoryEntry[] = [
+      createRateHistoryEntry(
+        `current-${Date.now()}`,
+        new Date().toISOString(),
+        tierRankToLP(currentEntry.tier, currentEntry.rank, currentEntry.leaguePoints),
+        currentEntry.wins,
+        currentEntry.losses
+      ),
+    ];
 
     // Sort matches by date in descending order (newest first) for reverse calculation
     const sortedMatchDetails = [...matchDetails].sort((a, b) => {
@@ -103,57 +122,46 @@ export async function POST(request: NextRequest) {
       return dateB - dateA; // Descending order (newest first)
     });
 
+    // Initialize tracking variables from current entry
+    // N (latest match) LP = C (currentEntry) LP
+    let estimatedTotalLP = tierRankToLP(currentEntry.tier, currentEntry.rank, currentEntry.leaguePoints);
+    let estimatedWins = currentEntry.wins;
+    let estimatedLosses = currentEntry.losses;
+
     // Process matches in reverse chronological order (newest first)
     // We'll work backwards from current LP to estimate past LP
-    // N (latest match) LP = C (currentEntry) LP
     // N-1 LP = N LP - (N match result: Win = -20, Loose = +20)
-    for (let i = 0; i < sortedMatchDetails.length; i++) {
-      const { match, matchId } = sortedMatchDetails[i];
-      
+    for (const { match, matchId } of sortedMatchDetails) {
       // Find the player in the match
       const participant = match.info.participants.find((p: any) => p.puuid === puuid);
       if (!participant) continue;
-
-      const matchDate = new Date(match.info.gameCreation);
-      const won = participant.win;
-
-      // For the first (newest) match N, set LP to currentEntry's LP value (C)
-      // This ensures the latest data (excluding current) matches LeagueEntries' LP value
-      if (i === 0) {
-        // N's LP value = C's LP value
-        estimatedTotalLP = tierRankToLP(currentEntry.tier, currentEntry.rank, currentEntry.leaguePoints);
-        estimatedWins = currentEntry.wins;
-        estimatedLosses = currentEntry.losses;
-      } else {
-        // For subsequent matches, the LP value is already calculated from the previous match's result
-        // No need to recalculate here, just use the current estimatedTotalLP
-      }
-
-      // Convert total LP back to tier/rank/lp using the utility function
-      const tierRankLP = lpToTierRank(estimatedTotalLP);
 
       if (!matchId) {
         console.warn('[Fetch Rate History] Match ID not found, skipping entry');
         continue;
       }
 
-      rateHistory.push({
-        matchId,
-        date: matchDate.toISOString(),
-        tier: tierRankLP.tier,
-        rank: tierRankLP.rank,
-        lp: tierRankLP.lp,
-        wins: estimatedWins,
-        losses: estimatedLosses,
-      });
+      const matchDate = new Date(match.info.gameCreation);
+      const won = participant.win;
 
-      // After adding N to rateHistory, calculate N-1 based on N's match result
+      // Add current match's LP to rate history
+      rateHistory.push(
+        createRateHistoryEntry(
+          matchId,
+          matchDate.toISOString(),
+          estimatedTotalLP,
+          estimatedWins,
+          estimatedLosses
+        )
+      );
+
+      // Calculate LP before this match based on match result
       // N-1 LP = N LP - (N match result: Win = -20, Loose = +20)
-      // This calculation is done after pushing N, so the next iteration will use N-1's LP value
-      const estimatedLPChange = won ? -20 : 20;
-      estimatedTotalLP += estimatedLPChange;
+      const lpChange = calculateLPChange(won);
+      estimatedTotalLP += lpChange;
       estimatedTotalLP = Math.max(0, estimatedTotalLP);
 
+      // Update wins/losses (working backwards)
       if (won) {
         estimatedWins--;
       } else {
@@ -164,21 +172,24 @@ export async function POST(request: NextRequest) {
     // Sort by date (oldest first)
     rateHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Prepare current entry for response (display purposes only)
+    // ⚠️ CRITICAL: currentEntry is provided for display purposes only (plotting)
+    // It should NOT be saved to database as it's not based on match history
+    // However, leagueId is included for cases where it needs to be saved
+    const currentEntryResponse = {
+      leagueId: currentEntry.leagueId || '',
+      tier: currentEntry.tier,
+      rank: currentEntry.rank,
+      lp: currentEntry.leaguePoints,
+      wins: currentEntry.wins,
+      losses: currentEntry.losses,
+      date: new Date().toISOString(),
+    };
+
     return NextResponse.json({
       message: 'Rate history fetched from match history',
       rateHistory,
-      // ⚠️ CRITICAL: currentEntry is provided for display purposes only (plotting)
-      // It should NOT be saved to database as it's not based on match history
-      // However, leagueId is included for cases where it needs to be saved
-      currentEntry: {
-        leagueId: currentEntry.leagueId || '',
-        tier: currentEntry.tier,
-        rank: currentEntry.rank,
-        lp: currentEntry.leaguePoints,
-        wins: currentEntry.wins,
-        losses: currentEntry.losses,
-        date: new Date().toISOString(),
-      },
+      currentEntry: currentEntryResponse,
       matchesProcessed: matchDetails.length,
       totalMatches: matchIds.length,
     });
