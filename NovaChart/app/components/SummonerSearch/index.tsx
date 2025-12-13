@@ -18,7 +18,7 @@ export default function SummonerSearch({
   onSearchSuccess 
 }: SummonerSearchProps = {}) {
   const [riotId, setRiotId] = useState('');
-  const [region, setRegion] = useState(DEFAULTS.REGION);
+  const [region, setRegion] = useState<string>(DEFAULTS.REGION);
   const [internalExpanded, setInternalExpanded] = useState(true);
   
   // Use prop if provided, otherwise use internal state

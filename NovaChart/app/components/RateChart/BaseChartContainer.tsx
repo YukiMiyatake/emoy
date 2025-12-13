@@ -128,7 +128,7 @@ export default function BaseChartContainer({
               activeDot={lineConfig.activeDot}
               connectNulls={lineConfig.connectNulls}
               isAnimationActive={lineConfig.isAnimationActive}
-              hide={lineConfig.hide}
+              hide={lineConfig.hide || false}
             />
           ))}
           <Brush

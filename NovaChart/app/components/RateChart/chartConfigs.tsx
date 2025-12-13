@@ -13,6 +13,7 @@ export interface LineConfig {
   isAnimationActive?: boolean;
   activeDot?: { r: number };
   type?: 'monotone' | 'linear';
+  hide?: boolean;
 }
 
 export interface ChartConfig {

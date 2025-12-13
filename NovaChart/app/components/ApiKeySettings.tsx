@@ -14,7 +14,7 @@ export default function ApiKeySettings({
   setIsExpanded: setIsExpandedProp 
 }: ApiKeySettingsProps = {}) {
   const [apiKey, setApiKey] = useState('');
-  const [region, setRegion] = useState(DEFAULTS.REGION);
+  const [region, setRegion] = useState<string>(DEFAULTS.REGION);
   const [isSaved, setIsSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [internalExpanded, setInternalExpanded] = useState(true);

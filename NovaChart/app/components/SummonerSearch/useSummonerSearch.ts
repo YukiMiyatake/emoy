@@ -56,18 +56,17 @@ export function useSummonerSearch(
       // currentEntry is provided for display purposes only and should NOT be saved
       if (result.rateHistory && result.rateHistory.length > 0) {
         const { addRateHistory, rateHistory: currentRateHistory } = useAppStore.getState();
+        const { rateHistoryService } = await import('@/lib/db');
+        
+        // Get existing matchIds to avoid re-fetching and re-saving
+        const existingMatchIds = new Set(
+          currentRateHistory.map(r => r.matchId).filter((id): id is string => !!id)
+        );
+        
         let addedCount = 0;
         let updatedCount = 0;
         let failedCount = 0;
         let skippedCount = 0;
-        
-        // Create a map of existing entries by date (same day) for comparison
-        const existingByDate = new Map<string, number>();
-        currentRateHistory.forEach(entry => {
-          const entryDate = new Date(entry.date);
-          const dateKey = getDateKey(entryDate);
-          existingByDate.set(dateKey, (existingByDate.get(dateKey) || 0) + 1);
-        });
         
         // Get today's date for comparison
         const today = new Date();
@@ -76,7 +75,37 @@ export function useSummonerSearch(
         
         for (const entry of result.rateHistory) {
           try {
+            // #region agent log
+            console.log('[SummonerSearch] Processing entry:', entry);
+            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:78',message:'Processing entry',data:{entry,hasMatchId:!!entry.matchId,matchId:entry.matchId,date:entry.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
+            // Skip if matchId is missing
+            if (!entry.matchId) {
+              skippedCount++;
+              logger.debug('[SummonerSearch] Skipping entry - missing matchId:', entry.date);
+              // #region agent log
+              console.warn('[SummonerSearch] Entry missing matchId:', entry);
+              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:85',message:'Skipping - missing matchId',data:{entry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              continue;
+            }
+            
+            // Skip if already exists (avoid re-fetching and re-saving)
+            if (existingMatchIds.has(entry.matchId)) {
+              skippedCount++;
+              logger.debug('[SummonerSearch] Skipping entry - already exists:', entry.matchId);
+              continue;
+            }
+            
             const entryDate = new Date(entry.date);
+            if (isNaN(entryDate.getTime())) {
+              // #region agent log
+              console.error('[SummonerSearch] Invalid date:', entry.date);
+              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:98',message:'Invalid date',data:{date:entry.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              failedCount++;
+              continue;
+            }
             const entryDateOnly = new Date(entryDate);
             entryDateOnly.setHours(0, 0, 0, 0);
             const entryDateOnlyTime = entryDateOnly.getTime();
@@ -89,10 +118,15 @@ export function useSummonerSearch(
               continue;
             }
             
-            const dateKey = getDateKey(entryDate);
-            const existedBefore = existingByDate.has(dateKey);
+            // Check if entry exists by matchId
+            const existing = await rateHistoryService.getByMatchId(entry.matchId);
+            const existedBefore = !!existing;
             
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:109',message:'Before addRateHistory',data:{matchId:entry.matchId,date:entryDate.toISOString(),dateType:typeof entryDate,tier:entry.tier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
             await addRateHistory({
+              matchId: entry.matchId,
               date: entryDate,
               tier: entry.tier,
               rank: entry.rank,
@@ -100,6 +134,9 @@ export function useSummonerSearch(
               wins: entry.wins,
               losses: entry.losses,
             });
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:120',message:'After addRateHistory',data:{matchId:entry.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
             
             // Reload state to get accurate count
             await useAppStore.getState().loadRateHistory();
@@ -109,15 +146,42 @@ export function useSummonerSearch(
               updatedCount++;
             } else {
               addedCount++;
-              existingByDate.set(dateKey, 1);
+              existingMatchIds.add(entry.matchId);
             }
           } catch (error) {
             failedCount++;
+            // #region agent log
+            console.error('[SummonerSearch] Error saving rate history entry:', error);
+            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:135',message:'Error saving entry',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined,entry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
             logger.error('[SummonerSearch] Error saving rate history entry:', error);
           }
         }
         
-        logger.info(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed, ${skippedCount} skipped (not based on match history)`);
+        logger.info(`[SummonerSearch] Rate history saved: ${addedCount} added, ${updatedCount} updated, ${failedCount} failed, ${skippedCount} skipped (${skippedCount - failedCount} already existed or missing matchId)`);
+        
+        // Save the latest entry from rateHistory (most recent match data from API)
+        // This is the actual latest data from match history, not the currentEntry
+        if (result.rateHistory && result.rateHistory.length > 0) {
+          const latestEntry = result.rateHistory[result.rateHistory.length - 1]; // Last entry is the most recent
+          if (latestEntry && latestEntry.matchId) {
+            try {
+              const { addRateHistory } = useAppStore.getState();
+              await addRateHistory({
+                matchId: latestEntry.matchId,
+                date: new Date(latestEntry.date),
+                tier: latestEntry.tier,
+                rank: latestEntry.rank,
+                lp: latestEntry.lp,
+                wins: latestEntry.wins || 0,
+                losses: latestEntry.losses || 0,
+              });
+              logger.info('[SummonerSearch] Saved latest rateHistory entry (most recent match data)');
+            } catch (error) {
+              logger.error('[SummonerSearch] Failed to save latest rateHistory entry:', error);
+            }
+          }
+        }
       }
 
       // ⚠️ CRITICAL: Update current league entry if not already set
@@ -227,9 +291,17 @@ export function useSummonerSearch(
 
         for (const matchData of result.matches) {
           try {
+            // Skip if matchId is missing
+            if (!matchData.matchId) {
+              logger.warn('[SummonerSearch] Skipping match - missing matchId:', matchData);
+              failedCount++;
+              continue;
+            }
+
             // 日付をDateオブジェクトに変換
-            const match: Omit<Match, 'id'> = {
+            const match: Match = {
               ...matchData,
+              matchId: matchData.matchId,
               date: new Date(matchData.date),
             };
 

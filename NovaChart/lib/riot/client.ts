@@ -375,9 +375,10 @@ export function lpToTierRank(totalLP: number): { tier: string; rank: string; lp:
  * Riot APIのマッチ詳細レスポンスから、指定されたプレイヤーのMatch型データを抽出
  * @param matchData Riot APIのマッチ詳細レスポンス
  * @param puuid 対象プレイヤーのPUUID
+ * @param matchId マッチID（必須）
  * @returns Match型のデータ、プレイヤーが見つからない場合はnull
  */
-export function parseMatchDetails(matchData: any, puuid: string): Match | null {
+export function parseMatchDetails(matchData: any, puuid: string, matchId: string): Match | null {
   try {
     const info = matchData.info;
     if (!info || !info.participants) {
@@ -447,6 +448,7 @@ export function parseMatchDetails(matchData: any, puuid: string): Match | null {
       : undefined;
 
     const match: Match = {
+      matchId: matchId, // Use provided matchId (required)
       date: new Date(gameEndTimestamp || info.gameStartTimestamp || Date.now()),
       win: participant.win || false,
       role: lane, // roleとlaneは同じ値を使用
@@ -462,7 +464,6 @@ export function parseMatchDetails(matchData: any, puuid: string): Match | null {
       damageToChampions: participant.totalDamageDealtToChampions || 0,
       goldEarned: participant.goldEarned || 0,
       csPerMin: Math.round(csPerMin * 10) / 10,
-      matchId: matchData.metadata?.matchId,
       gameDuration,
       totalMinionsKilled,
       neutralMinionsKilled,
@@ -497,7 +498,7 @@ export async function fetchAndParseMatchDetails(
       logger.debug(`[fetchAndParseMatchDetails] Fetching match ${i + 1}/${matchIds.length}: ${matchId}`);
       
       const matchData = await client.getMatchByMatchId(matchId);
-      const match = parseMatchDetails(matchData, puuid);
+      const match = parseMatchDetails(matchData, puuid, matchId);
       
       if (match) {
         matches.push(match);

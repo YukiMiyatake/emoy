@@ -70,7 +70,15 @@ export function useDamageChartData(
 
     // 移動平均を計算
     const damageValues = dataPoints.map(d => d.damagePerMin);
-    const movingAvg = calculateMovingAverage(damageValues, movingAverageWindow);
+    // Calculate moving average manually for number array
+    const movingAvg: number[] = [];
+    for (let i = 0; i < damageValues.length; i++) {
+      const start = Math.max(0, i - movingAverageWindow + 1);
+      const window = damageValues.slice(start, i + 1);
+      const sum = window.reduce((acc, val) => acc + (isNaN(val) ? 0 : val), 0);
+      const count = window.filter(val => !isNaN(val)).length;
+      movingAvg.push(count > 0 ? sum / count : NaN);
+    }
     movingAvg.forEach((avg, index) => {
       if (dataPoints[index]) {
         dataPoints[index].movingAverage = Math.round(avg);
