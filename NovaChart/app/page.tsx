@@ -293,11 +293,24 @@ export default function Home() {
             logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed, ${skippedCount} skipped (not based on match history)`);
           }
 
-          // ⚠️ CRITICAL: Update league entry if available
-          // Note: fetch-rate-history API already returns only solo queue data,
-          // but we explicitly set queueType to 'RANKED_SOLO_5x5' for safety.
-          // setCurrentLeagueEntry will also validate that it's solo queue.
+          // ⚠️ CRITICAL: Save currentEntry (latest LP data) to rateHistory
+          // This is the current LP data from the API, which should be saved to DB
           if (result.currentEntry) {
+            try {
+              await addRateHistory({
+                date: new Date(result.currentEntry.date),
+                tier: result.currentEntry.tier,
+                rank: result.currentEntry.rank,
+                lp: result.currentEntry.lp,
+                wins: result.currentEntry.wins || 0,
+                losses: result.currentEntry.losses || 0,
+              });
+              logger.info('[Update] Saved currentEntry (latest LP data) to rateHistory');
+            } catch (error) {
+              logger.error('[Update] Failed to save currentEntry to rateHistory:', error);
+            }
+
+            // Update league entry for display
             const entry: LeagueEntry = {
               leagueId: '',
               queueType: 'RANKED_SOLO_5x5', // Explicitly set to solo queue

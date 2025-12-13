@@ -111,7 +111,7 @@ export const goalService = {
   },
 
   async getActive(): Promise<Goal | undefined> {
-    return await db.goals.where('isActive').equals(true).first();
+    return await db.goals.where('isActive').equals(1).first();
   },
 
   async add(goal: Omit<Goal, 'id'>): Promise<number> {
@@ -261,7 +261,7 @@ export const skillGoalService = {
   },
 
   async getActive(): Promise<SkillGoal[]> {
-    return await db.skillGoals.where('isActive').equals(true).toArray();
+    return await db.skillGoals.where('isActive').equals(1).toArray();
   },
 
   async getByType(type: SkillGoal['type']): Promise<SkillGoal[]> {
