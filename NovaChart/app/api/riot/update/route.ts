@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: 'League entry retrieved',
       entry: {
+        leagueId: entry.leagueId || '',
         tier: entry.tier,
         rank: entry.rank,
         lp: entry.leaguePoints,

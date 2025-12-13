@@ -1,6 +1,7 @@
 import React from 'react';
 import { lpToTierRank } from '@/lib/riot/client';
 import { ChartDataResult } from './useChartData';
+import { LPTooltip } from './LPTooltip';
 
 export interface LineConfig {
   dataKey: string;
@@ -21,6 +22,7 @@ export interface ChartConfig {
   yAxisLabel?: { value: string; angle: number; position: string };
   yAxisAllowDecimals: boolean;
   tooltipFormatter: (value: number, name: string, props: any) => string | number;
+  tooltipContent?: React.ComponentType<any>;
   baseLines: (movingAverageWindow: number, hiddenLines: Set<string>) => LineConfig[];
   goalLines?: (chartData: ChartDataResult, movingAverageWindow: number, hiddenLines: Set<string>) => LineConfig[];
   brushColor: string;
@@ -78,6 +80,7 @@ export const lpChartConfig: ChartConfig = {
     }
     return Math.round(value);
   },
+  tooltipContent: LPTooltip,
   baseLines: (movingAverageWindow: number, hiddenLines: Set<string>) => [
     {
       dataKey: 'lp',

@@ -62,8 +62,20 @@ export function useChartData(
 
     logger.debug('[RateChart] Processing rate history:', sorted.length, 'entries');
 
+    // Group by date (same day) and keep only the last entry for each day
+    const dateMap = new Map<string, RateHistory>();
+    sorted.forEach((entry) => {
+      const date = new Date(entry.date);
+      const dateStr = formatDateShort(date);
+      // Keep the last entry for each date (since sorted is already sorted by date)
+      dateMap.set(dateStr, entry);
+    });
+    
+    // Convert map values back to array (already sorted by date since we iterated sorted array)
+    const filteredSorted = Array.from(dateMap.values());
+
     // Create data points with full date info for sorting
-    const dataPoints: (ChartDataPoint & { dateTime: number; originalEntry: RateHistory })[] = sorted.map((entry) => {
+    const dataPoints: (ChartDataPoint & { dateTime: number; originalEntry: RateHistory })[] = filteredSorted.map((entry) => {
       const dateTime = new Date(entry.date).getTime();
       const totalLP = tierRankToLP(entry.tier, entry.rank, entry.lp);
       const date = new Date(entry.date);
@@ -77,8 +89,8 @@ export function useChartData(
       };
     });
 
-    // Add moving average
-    const movingAvg = calculateMovingAverage(sorted, movingAverageWindow);
+    // Add moving average (use filtered data)
+    const movingAvg = calculateMovingAverage(filteredSorted, movingAverageWindow);
     movingAvg.forEach((avg, index) => {
       if (dataPoints[index]) {
         dataPoints[index].movingAverage = avg.value;
@@ -111,8 +123,8 @@ export function useChartData(
       });
     }
 
-    // Add prediction points
-    const predictions = generatePredictionPoints(sorted, 30);
+    // Add prediction points (use filtered data)
+    const predictions = generatePredictionPoints(filteredSorted, 30);
     const predictionPoints: (ChartDataPoint & { dateTime: number })[] = predictions.map((pred) => {
       const dateTime = new Date(pred.date).getTime();
       const date = new Date(pred.date);
@@ -154,13 +166,13 @@ export function useChartData(
         const createdAt = new Date(goal.createdAt).getTime();
         startDate = createdAt;
         
-        const entriesBeforeCreatedAt = sorted.filter(e => new Date(e.date).getTime() <= createdAt);
+        const entriesBeforeCreatedAt = filteredSorted.filter(e => new Date(e.date).getTime() <= createdAt);
         let closestEntry: RateHistory | undefined;
         
         if (entriesBeforeCreatedAt.length > 0) {
           closestEntry = entriesBeforeCreatedAt[entriesBeforeCreatedAt.length - 1];
-        } else if (sorted.length > 0) {
-          closestEntry = sorted[0];
+        } else if (filteredSorted.length > 0) {
+          closestEntry = filteredSorted[0];
         }
         
         if (closestEntry) {

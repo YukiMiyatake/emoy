@@ -6,144 +6,67 @@ export class NovaChartDB extends Dexie {
   goals!: Table<Goal, number>;
   matches!: Table<Match, string>; // matchId as primary key (string)
   summoners!: Table<Summoner, string>;
-  leagueEntries!: Table<LeagueEntry & { puuid: string; lastUpdated: Date }, string>; // puuid as primary key
+  leagueEntries!: Table<LeagueEntry & { puuid: string; lastUpdated: Date }, string>; // leagueId as primary key
   skillGoals!: Table<SkillGoal, number>;
 
   constructor() {
     // Use a new database name to avoid primary key migration issues
     // This will create a fresh database with the correct schema
-    // Changed to v4 to avoid version conflicts with existing databases (matches table now uses matchId as key)
-    super('NovaChartDB_v4');
+    // Changed to v6 to avoid version conflicts with existing databases (leagueEntries table now uses leagueId as primary key)
+    super('NovaChartDB_v6');
     
-    // Start directly with the correct schema (puuid as primary key)
+    // Start directly with the correct schema (leagueId as primary key for leagueEntries)
+    // This is a new database (v6), so we start with the final schema
     // If users have old data, they will need to re-add their summoners
     this.version(1).stores({
-      rateHistory: '++id, date, tier, rank, lp',
+      rateHistory: '&matchId, date, tier, rank, lp', // matchId as primary key
       goals: '++id, targetDate, createdAt, isActive',
-      matches: '++id, date, win, role, champion',
-      summoners: '&puuid, id, name, region, lastUpdated', // &puuid = unique primary key
-    });
-    
-    // Version 2: Add leagueEntries table
-    this.version(2).stores({
-      rateHistory: '++id, date, tier, rank, lp',
-      goals: '++id, targetDate, createdAt, isActive',
-      matches: '++id, date, win, role, champion',
-      summoners: '&puuid, id, name, region, lastUpdated',
-      leagueEntries: '&puuid, queueType, lastUpdated', // &puuid = unique primary key, only solo queue entries
-    });
-
-    // Version 3: Add skillGoals table
-    this.version(3).stores({
-      rateHistory: '++id, date, tier, rank, lp',
-      goals: '++id, targetDate, createdAt, isActive',
-      matches: '++id, date, win, role, champion',
-      summoners: '&puuid, id, name, region, lastUpdated',
-      leagueEntries: '&puuid, queueType, lastUpdated',
+      matches: '&matchId, date, win, role, champion', // matchId as primary key
+      summoners: '&puuid, id, name, region, lastUpdated', // puuid as primary key
+      leagueEntries: '&leagueId, puuid, queueType, lastUpdated', // leagueId as primary key (Riot API spec), puuid as index
       skillGoals: '++id, type, lane, createdAt, isActive',
-    });
-
-    // Version 4: Change rateHistory primary key from id (number) to matchId (string)
-    // This deletes and recreates the rateHistory table with the new schema
-    this.version(4).stores({
-      rateHistory: '&matchId, date, tier, rank, lp', // &matchId = unique primary key (string)
-      goals: '++id, targetDate, createdAt, isActive',
-      matches: '++id, date, win, role, champion',
-      summoners: '&puuid, id, name, region, lastUpdated',
-      leagueEntries: '&puuid, queueType, lastUpdated',
-      skillGoals: '++id, type, lane, createdAt, isActive',
-    }).upgrade(async (tx) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:56',message:'Version 4 migration started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      // Clear rateHistory table - old data with id key will be lost
-      // This is intentional as we're changing the primary key type
-      await tx.table('rateHistory').clear();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:60',message:'Version 4 migration completed - rateHistory cleared',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-    });
-
-    // Version 5: Change matches primary key from id (number) to matchId (string)
-    // This deletes and recreates the matches table with the new schema
-    this.version(5).stores({
-      rateHistory: '&matchId, date, tier, rank, lp',
-      goals: '++id, targetDate, createdAt, isActive',
-      matches: '&matchId, date, win, role, champion', // &matchId = unique primary key (string)
-      summoners: '&puuid, id, name, region, lastUpdated',
-      leagueEntries: '&puuid, queueType, lastUpdated',
-      skillGoals: '++id, type, lane, createdAt, isActive',
-    }).upgrade(async (tx) => {
-      // Clear matches table - old data with id key will be lost
-      // This is intentional as we're changing the primary key type
-      await tx.table('matches').clear();
     });
   }
 }
 
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:68',message:'Initializing NovaChartDB',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-// #endregion
-
 // Delete old databases to avoid version conflicts
+// This must run BEFORE creating the new database instance
 if (typeof window !== 'undefined' && 'indexedDB' in window) {
   // Delete old database versions that might cause conflicts
-  const oldDbNames = ['NovaChartDB', 'NovaChartDB_v2', 'NovaChartDB_v3'];
-  oldDbNames.forEach(async (dbName) => {
+  const oldDbNames = ['NovaChartDB', 'NovaChartDB_v2', 'NovaChartDB_v3', 'NovaChartDB_v4', 'NovaChartDB_v5'];
+  
+  oldDbNames.forEach((dbName) => {
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:73',message:'Attempting to delete old database',data:{dbName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       const deleteReq = indexedDB.deleteDatabase(dbName);
       deleteReq.onsuccess = () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:77',message:'Old database deleted',data:{dbName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-        // #endregion
         console.log(`[NovaChartDB] Deleted old database: ${dbName}`);
       };
       deleteReq.onerror = () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:81',message:'Failed to delete old database',data:{dbName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-        // #endregion
         console.warn(`[NovaChartDB] Failed to delete old database: ${dbName}`);
       };
+      deleteReq.onblocked = () => {
+        console.warn(`[NovaChartDB] Database deletion blocked (may have open connections): ${dbName}`);
+      };
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:85',message:'Error deleting old database',data:{dbName,error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       console.warn(`[NovaChartDB] Error deleting old database ${dbName}:`, error);
     }
   });
 }
 
+// Create database instance
+// Note: Old database deletion happens asynchronously, but since we're using a new database name (v6),
+// there should be no conflict. If there are still issues, the user may need to manually clear IndexedDB.
 export const db = new NovaChartDB();
-// #region agent log
-fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:92',message:'NovaChartDB initialized',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-// #endregion
 
 // Helper functions for data operations
 export const rateHistoryService = {
   async getAll(): Promise<RateHistory[]> {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:64',message:'getAll called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     try {
       const result = await db.rateHistory.orderBy('date').toArray();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:68',message:'getAll result',data:{count:result.length,firstEntry:result[0]?{matchId:result[0].matchId,hasId:!!(result[0] as any).id}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       // Filter out any entries without matchId (should not happen, but safety check)
       const valid = result.filter(r => r.matchId);
-      if (valid.length !== result.length) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:72',message:'Filtered invalid entries',data:{original:result.length,filtered:valid.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
-      }
       return valid;
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:76',message:'getAll error',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       throw error;
     }
   },
@@ -165,14 +88,8 @@ export const rateHistoryService = {
   },
 
   async add(rate: RateHistory): Promise<string> {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:95',message:'add called',data:{matchId:rate.matchId,date:rate.date,tier:rate.tier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     // Validate matchId
     if (!rate.matchId || typeof rate.matchId !== 'string') {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:99',message:'Invalid matchId',data:{matchId:rate.matchId,type:typeof rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       throw new Error(`Invalid matchId: ${rate.matchId}`);
     }
     // Check for duplicate by matchId
@@ -181,9 +98,6 @@ export const rateHistoryService = {
     if (existing) {
       // Update existing entry instead of adding duplicate
       console.log('[RateHistoryService] Duplicate entry found for matchId:', rate.matchId, 'Updating existing entry');
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:108',message:'Updating existing entry',data:{matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       await db.rateHistory.update(rate.matchId, {
         date: rate.date,
         tier: rate.tier,
@@ -195,21 +109,7 @@ export const rateHistoryService = {
       return rate.matchId;
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:121',message:'Adding new entry',data:{matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-    try {
-      const result = await db.rateHistory.add(rate);
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:125',message:'Entry added successfully',data:{matchId:result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      return result;
-    } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db/index.ts:129',message:'Add error',data:{error:error instanceof Error?error.message:String(error),matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      throw error;
-    }
+    return await db.rateHistory.add(rate);
   },
 
   async update(matchId: string, changes: Partial<Omit<RateHistory, 'matchId'>>): Promise<number> {
@@ -346,25 +246,60 @@ export const summonerService = {
 
 // ⚠️ CRITICAL: League entry service - ONLY stores RANKED_SOLO_5x5 (solo queue) entries
 // This mistake has been made multiple times. DO NOT store any other queue types.
+// ⚠️ NOTE: Primary key is leagueId (as per Riot API specification), not puuid.
 export const leagueEntryService = {
   /**
-   * Get league entry by PUUID (solo queue only)
+   * Get league entry by leagueId
    * ⚠️ CRITICAL: Only returns solo queue entries. Non-solo queue entries are rejected.
    */
-  async getByPuuid(puuid: string): Promise<(LeagueEntry & { puuid: string; lastUpdated: Date }) | undefined> {
-    const entry = await db.leagueEntries.get(puuid);
+  async getByLeagueId(leagueId: string): Promise<(LeagueEntry & { puuid: string; lastUpdated: Date }) | undefined> {
+    if (!leagueId || leagueId.trim() === '') {
+      return undefined;
+    }
+    const entry = await db.leagueEntries.get(leagueId);
     // Double-check it's solo queue (safety check)
     if (entry && entry.queueType !== 'RANKED_SOLO_5x5') {
       console.warn('[LeagueEntryService] Found non-solo queue entry in database, deleting:', entry.queueType);
-      await db.leagueEntries.delete(puuid);
+      await db.leagueEntries.delete(leagueId);
       return undefined;
     }
     return entry;
   },
 
   /**
+   * Get league entry by PUUID (solo queue only)
+   * ⚠️ CRITICAL: Only returns solo queue entries. Non-solo queue entries are rejected.
+   * Note: Uses puuid index to find entry, but primary key is leagueId.
+   */
+  async getByPuuid(puuid: string): Promise<(LeagueEntry & { puuid: string; lastUpdated: Date }) | undefined> {
+    if (!puuid || puuid.trim() === '') {
+      return undefined;
+    }
+    // Use puuid index to find entry
+    const entries = await db.leagueEntries.where('puuid').equals(puuid).toArray();
+    // Filter for solo queue only (should be only one, but safety check)
+    const soloQueueEntries = entries.filter(e => e.queueType === 'RANKED_SOLO_5x5');
+    if (soloQueueEntries.length === 0) {
+      return undefined;
+    }
+    // If multiple entries found (shouldn't happen), delete non-solo queue entries
+    if (soloQueueEntries.length > 1) {
+      console.warn('[LeagueEntryService] Multiple solo queue entries found for puuid, keeping first one');
+    }
+    // Delete any non-solo queue entries
+    for (const entry of entries) {
+      if (entry.queueType !== 'RANKED_SOLO_5x5') {
+        console.warn('[LeagueEntryService] Found non-solo queue entry in database, deleting:', entry.queueType);
+        await db.leagueEntries.delete(entry.leagueId);
+      }
+    }
+    return soloQueueEntries[0];
+  },
+
+  /**
    * Add or update league entry (solo queue only)
    * ⚠️ CRITICAL: Only accepts RANKED_SOLO_5x5 entries. Rejects all other queue types.
+   * ⚠️ NOTE: leagueId is required and used as primary key (as per Riot API specification).
    */
   async addOrUpdate(puuid: string, entry: LeagueEntry): Promise<string> {
     // ⚠️ CRITICAL: Only allow solo queue entries
@@ -375,6 +310,11 @@ export const leagueEntryService = {
     if (!puuid || puuid.trim() === '') {
       throw new Error('PUUID is required');
     }
+
+    // ⚠️ CRITICAL: leagueId is required (primary key)
+    if (!entry.leagueId || entry.leagueId.trim() === '') {
+      throw new Error('LeagueId is required. LeagueId is the unique identifier for league entries according to Riot API specification.');
+    }
     
     return await db.leagueEntries.put({
       ...entry,
@@ -384,10 +324,29 @@ export const leagueEntryService = {
   },
 
   /**
+   * Delete league entry by leagueId
+   */
+  async deleteByLeagueId(leagueId: string): Promise<void> {
+    if (!leagueId || leagueId.trim() === '') {
+      return;
+    }
+    return await db.leagueEntries.delete(leagueId);
+  },
+
+  /**
    * Delete league entry by PUUID
+   * Note: Finds entry by puuid index and deletes by leagueId (primary key)
    */
   async delete(puuid: string): Promise<void> {
-    return await db.leagueEntries.delete(puuid);
+    if (!puuid || puuid.trim() === '') {
+      return;
+    }
+    // Find entry by puuid index
+    const entries = await db.leagueEntries.where('puuid').equals(puuid).toArray();
+    // Delete all entries for this puuid (should be only one for solo queue)
+    for (const entry of entries) {
+      await db.leagueEntries.delete(entry.leagueId);
+    }
   },
 
   /**

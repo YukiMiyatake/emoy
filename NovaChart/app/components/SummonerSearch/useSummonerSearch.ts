@@ -26,7 +26,6 @@ export function useSummonerSearch(
         return;
       }
 
-      logger.debug('[SummonerSearch] Automatically fetching rate history from match history...');
       const response = await fetch(API_ENDPOINTS.RIOT.FETCH_RATE_HISTORY, {
         method: 'POST',
         headers: {
@@ -48,8 +47,6 @@ export function useSummonerSearch(
       }
 
       const result = await response.json();
-      logger.debug('[SummonerSearch] Rate history fetched:', result);
-      logger.debug('[SummonerSearch] Rate history entries:', result.rateHistory?.length || 0);
 
       // Save rate history to database
       // ⚠️ CRITICAL: Only save entries based on match history
@@ -75,34 +72,27 @@ export function useSummonerSearch(
         
         for (const entry of result.rateHistory) {
           try {
-            // #region agent log
-            console.log('[SummonerSearch] Processing entry:', entry);
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:78',message:'Processing entry',data:{entry,hasMatchId:!!entry.matchId,matchId:entry.matchId,date:entry.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             // Skip if matchId is missing
             if (!entry.matchId) {
               skippedCount++;
-              logger.debug('[SummonerSearch] Skipping entry - missing matchId:', entry.date);
-              // #region agent log
-              console.warn('[SummonerSearch] Entry missing matchId:', entry);
-              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:85',message:'Skipping - missing matchId',data:{entry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               continue;
             }
             
             // Skip if already exists (avoid re-fetching and re-saving)
             if (existingMatchIds.has(entry.matchId)) {
               skippedCount++;
-              logger.debug('[SummonerSearch] Skipping entry - already exists:', entry.matchId);
+              continue;
+            }
+            
+            // ⚠️ CRITICAL: Skip entries with matchId starting with "current-"
+            // These are current entry data for display purposes only and should NOT be saved to database
+            if (entry.matchId && entry.matchId.startsWith('current-')) {
+              skippedCount++;
               continue;
             }
             
             const entryDate = new Date(entry.date);
             if (isNaN(entryDate.getTime())) {
-              // #region agent log
-              console.error('[SummonerSearch] Invalid date:', entry.date);
-              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:98',message:'Invalid date',data:{date:entry.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               failedCount++;
               continue;
             }
@@ -114,7 +104,6 @@ export function useSummonerSearch(
             // These are not based on match history and should not be saved
             if (entryDateOnlyTime >= todayTime) {
               skippedCount++;
-              logger.debug('[SummonerSearch] Skipping entry - not based on match history:', entry.date);
               continue;
             }
             
@@ -122,9 +111,6 @@ export function useSummonerSearch(
             const existing = await rateHistoryService.getByMatchId(entry.matchId);
             const existedBefore = !!existing;
             
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:109',message:'Before addRateHistory',data:{matchId:entry.matchId,date:entryDate.toISOString(),dateType:typeof entryDate,tier:entry.tier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             await addRateHistory({
               matchId: entry.matchId,
               date: entryDate,
@@ -134,9 +120,6 @@ export function useSummonerSearch(
               wins: entry.wins,
               losses: entry.losses,
             });
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:120',message:'After addRateHistory',data:{matchId:entry.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             
             // Reload state to get accurate count
             await useAppStore.getState().loadRateHistory();
@@ -150,10 +133,6 @@ export function useSummonerSearch(
             }
           } catch (error) {
             failedCount++;
-            // #region agent log
-            console.error('[SummonerSearch] Error saving rate history entry:', error);
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:135',message:'Error saving entry',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined,entry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             logger.error('[SummonerSearch] Error saving rate history entry:', error);
           }
         }
@@ -162,9 +141,10 @@ export function useSummonerSearch(
         
         // Save the latest entry from rateHistory (most recent match data from API)
         // This is the actual latest data from match history, not the currentEntry
+        // ⚠️ CRITICAL: Skip entries with matchId starting with "current-" (current entry for display only)
         if (result.rateHistory && result.rateHistory.length > 0) {
           const latestEntry = result.rateHistory[result.rateHistory.length - 1]; // Last entry is the most recent
-          if (latestEntry && latestEntry.matchId) {
+          if (latestEntry && latestEntry.matchId && !latestEntry.matchId.startsWith('current-')) {
             try {
               const { addRateHistory } = useAppStore.getState();
               await addRateHistory({
@@ -191,7 +171,7 @@ export function useSummonerSearch(
       const currentState = useAppStore.getState();
       if (result.currentEntry && !currentState.currentLeagueEntry) {
         const entry: LeagueEntry = {
-          leagueId: '',
+          leagueId: result.currentEntry.leagueId || '',
           queueType: DEFAULTS.QUEUE_TYPE, // Explicitly set to RANKED_SOLO_5x5
           tier: result.currentEntry.tier,
           rank: result.currentEntry.rank,
@@ -206,13 +186,18 @@ export function useSummonerSearch(
         setCurrentLeagueEntry(entry); // This will validate it's solo queue
         
         // Save to database (solo queue only)
-        try {
-          const { leagueEntryService } = await import('@/lib/db');
-          await leagueEntryService.addOrUpdate(puuid, entry);
-          logger.info('[SummonerSearch] Saved solo queue league entry from rate history to database');
-        } catch (dbError) {
-          logger.error('[SummonerSearch] Failed to save league entry from rate history to database:', dbError);
-          // Don't throw - we still have the entry in memory
+        // ⚠️ NOTE: Only save if leagueId is present (required for primary key)
+        if (entry.leagueId && entry.leagueId.trim() !== '') {
+          try {
+            const { leagueEntryService } = await import('@/lib/db');
+            await leagueEntryService.addOrUpdate(puuid, entry);
+            logger.info('[SummonerSearch] Saved solo queue league entry from rate history to database');
+          } catch (dbError) {
+            logger.error('[SummonerSearch] Failed to save league entry from rate history to database:', dbError);
+            // Don't throw - we still have the entry in memory
+          }
+        } else {
+          logger.warn('[SummonerSearch] Skipping save of league entry - leagueId is missing');
         }
       }
 
@@ -237,15 +222,12 @@ export function useSummonerSearch(
         existingMatches.map(m => m.matchId).filter((id): id is string => !!id)
       );
 
-      logger.debug(`[SummonerSearch] Found ${existingMatchIds.size} existing matches in database`);
-
       // マッチIDを取得
       const { RiotApiClient } = await import('@/lib/riot/client');
       const client = new RiotApiClient(apiKey, region);
       const allMatchIds = await client.getAllRankedMatchIds(puuid, 20);
       
       if (allMatchIds.length === 0) {
-        logger.debug('[SummonerSearch] No match IDs found');
         return;
       }
 
@@ -256,8 +238,6 @@ export function useSummonerSearch(
         logger.info('[SummonerSearch] All matches already exist in database, skipping fetch');
         return;
       }
-
-      logger.debug(`[SummonerSearch] Fetching ${newMatchIds.length} new match details (${allMatchIds.length - newMatchIds.length} already exist)`);
 
       // 新しいmatchIdだけを詳細取得
       const response = await fetch(API_ENDPOINTS.RIOT.FETCH_MATCH_DETAILS, {
@@ -281,7 +261,6 @@ export function useSummonerSearch(
       }
 
       const result = await response.json();
-      logger.debug('[SummonerSearch] Match details fetched:', result);
 
       // Save match details to database
       if (result.matches && result.matches.length > 0) {
@@ -355,11 +334,9 @@ export function useSummonerSearch(
       
       if (response.ok) {
         const data = await response.json();
-        logger.debug('[SummonerSearch] Response data:', data);
         
         // Check if data has summoner property or is the summoner itself
         const summonerData = data?.summoner || data;
-        logger.debug('[SummonerSearch] Summoner data:', summonerData);
         
         if (!summonerData) {
           logger.error('[SummonerSearch] Summoner data is null or undefined');
@@ -384,7 +361,6 @@ export function useSummonerSearch(
             if (apiKey) {
               const client = new RiotApiClient(apiKey, currentRegion);
               const fullSummonerData = await client.getSummonerByPuuid(summonerData.puuid);
-              logger.debug('[SummonerSearch] Fetched full summoner data:', fullSummonerData);
               // Merge missing fields into summonerData
               if (fullSummonerData.name) {
                 summonerData.name = fullSummonerData.name;
@@ -398,7 +374,6 @@ export function useSummonerSearch(
               if (fullSummonerData.id) {
                 summonerData.id = fullSummonerData.id;
               }
-              logger.debug('[SummonerSearch] Updated summonerData:', summonerData);
             }
           } catch (error) {
             logger.warn('[SummonerSearch] Error fetching summoner name:', error);
@@ -412,8 +387,6 @@ export function useSummonerSearch(
             ? summonerData.lastUpdated 
             : new Date(summonerData.lastUpdated),
         };
-        
-        logger.debug('[SummonerSearch] Processed summoner:', summoner);
         
         setCurrentSummoner(summoner);
         
@@ -475,7 +448,6 @@ export function useSummonerSearch(
         try {
           const { summonerService } = await import('@/lib/db');
           await summonerService.addOrUpdate(summoner);
-          logger.debug('[SummonerSearch] Summoner saved to database successfully');
         } catch (error) {
           logger.error('[SummonerSearch] Failed to save summoner to database:', error);
           // Don't throw - we can still use the summoner even if save fails

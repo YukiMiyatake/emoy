@@ -93,13 +93,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadRateHistory: async () => {
     try {
       set({ isLoading: true, error: null });
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:93',message:'loadRateHistory called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       const history = await rateHistoryService.getAll();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:97',message:'loadRateHistory success',data:{count:history.length,firstEntry:history[0]?{matchId:history[0].matchId,date:history[0].date,dateType:typeof history[0].date}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       // Ensure dates are Date objects
       const normalizedHistory = history.map(entry => ({
         ...entry,
@@ -107,9 +101,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
       set({ rateHistory: normalizedHistory, isLoading: false });
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:105',message:'loadRateHistory error',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       console.error('[useAppStore] loadRateHistory error:', error);
       handleStoreError(set, error, 'Failed to load rate history');
     }
@@ -118,9 +109,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   addRateHistory: async (rate) => {
     try {
       set({ isLoading: true, error: null });
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:107',message:'addRateHistory called',data:{matchId:rate.matchId,date:rate.date,dateType:typeof rate.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       // Ensure date is a Date object
       const normalizedRate = {
         ...rate,
@@ -129,13 +117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // add() method now handles duplicate checking internally
       await rateHistoryService.add(normalizedRate);
       await get().loadRateHistory();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:115',message:'addRateHistory success',data:{matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppStore.ts:118',message:'addRateHistory error',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined,matchId:rate.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       console.error('[useAppStore] addRateHistory error:', error);
       handleStoreError(set, error, 'Failed to add rate history');
     }
