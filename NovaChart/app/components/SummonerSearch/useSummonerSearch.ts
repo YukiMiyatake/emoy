@@ -75,18 +75,10 @@ export function useSummonerSearch(
         
         for (const entry of result.rateHistory) {
           try {
-            // #region agent log
-            console.log('[SummonerSearch] Processing entry:', entry);
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:78',message:'Processing entry',data:{entry,hasMatchId:!!entry.matchId,matchId:entry.matchId,date:entry.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             // Skip if matchId is missing
             if (!entry.matchId) {
               skippedCount++;
               logger.debug('[SummonerSearch] Skipping entry - missing matchId:', entry.date);
-              // #region agent log
-              console.warn('[SummonerSearch] Entry missing matchId:', entry);
-              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:85',message:'Skipping - missing matchId',data:{entry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               continue;
             }
             
@@ -99,10 +91,6 @@ export function useSummonerSearch(
             
             const entryDate = new Date(entry.date);
             if (isNaN(entryDate.getTime())) {
-              // #region agent log
-              console.error('[SummonerSearch] Invalid date:', entry.date);
-              fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:98',message:'Invalid date',data:{date:entry.date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-              // #endregion
               failedCount++;
               continue;
             }
@@ -122,9 +110,6 @@ export function useSummonerSearch(
             const existing = await rateHistoryService.getByMatchId(entry.matchId);
             const existedBefore = !!existing;
             
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:109',message:'Before addRateHistory',data:{matchId:entry.matchId,date:entryDate.toISOString(),dateType:typeof entryDate,tier:entry.tier},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             await addRateHistory({
               matchId: entry.matchId,
               date: entryDate,
@@ -134,9 +119,6 @@ export function useSummonerSearch(
               wins: entry.wins,
               losses: entry.losses,
             });
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:120',message:'After addRateHistory',data:{matchId:entry.matchId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             
             // Reload state to get accurate count
             await useAppStore.getState().loadRateHistory();
@@ -150,10 +132,6 @@ export function useSummonerSearch(
             }
           } catch (error) {
             failedCount++;
-            // #region agent log
-            console.error('[SummonerSearch] Error saving rate history entry:', error);
-            fetch('http://127.0.0.1:7243/ingest/d330803d-3a0f-4516-8960-6b4804e42617',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useSummonerSearch.ts:135',message:'Error saving entry',data:{error:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:undefined,entry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             logger.error('[SummonerSearch] Error saving rate history entry:', error);
           }
         }
@@ -191,7 +169,7 @@ export function useSummonerSearch(
       const currentState = useAppStore.getState();
       if (result.currentEntry && !currentState.currentLeagueEntry) {
         const entry: LeagueEntry = {
-          leagueId: '',
+          leagueId: result.currentEntry.leagueId || '',
           queueType: DEFAULTS.QUEUE_TYPE, // Explicitly set to RANKED_SOLO_5x5
           tier: result.currentEntry.tier,
           rank: result.currentEntry.rank,
@@ -206,13 +184,18 @@ export function useSummonerSearch(
         setCurrentLeagueEntry(entry); // This will validate it's solo queue
         
         // Save to database (solo queue only)
-        try {
-          const { leagueEntryService } = await import('@/lib/db');
-          await leagueEntryService.addOrUpdate(puuid, entry);
-          logger.info('[SummonerSearch] Saved solo queue league entry from rate history to database');
-        } catch (dbError) {
-          logger.error('[SummonerSearch] Failed to save league entry from rate history to database:', dbError);
-          // Don't throw - we still have the entry in memory
+        // ⚠️ NOTE: Only save if leagueId is present (required for primary key)
+        if (entry.leagueId && entry.leagueId.trim() !== '') {
+          try {
+            const { leagueEntryService } = await import('@/lib/db');
+            await leagueEntryService.addOrUpdate(puuid, entry);
+            logger.info('[SummonerSearch] Saved solo queue league entry from rate history to database');
+          } catch (dbError) {
+            logger.error('[SummonerSearch] Failed to save league entry from rate history to database:', dbError);
+            // Don't throw - we still have the entry in memory
+          }
+        } else {
+          logger.warn('[SummonerSearch] Skipping save of league entry - leagueId is missing');
         }
       }
 

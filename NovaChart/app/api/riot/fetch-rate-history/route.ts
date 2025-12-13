@@ -150,7 +150,9 @@ export async function POST(request: NextRequest) {
       rateHistory,
       // ⚠️ CRITICAL: currentEntry is provided for display purposes only (plotting)
       // It should NOT be saved to database as it's not based on match history
+      // However, leagueId is included for cases where it needs to be saved
       currentEntry: {
+        leagueId: currentEntry.leagueId || '',
         tier: currentEntry.tier,
         rank: currentEntry.rank,
         lp: currentEntry.leaguePoints,

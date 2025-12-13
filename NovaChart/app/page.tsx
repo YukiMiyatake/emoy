@@ -340,9 +340,11 @@ export default function Home() {
           }
 
           // Update league entry for display
+          // Note: update API doesn't return leagueId, so we can't save it to database
+          // The league entry should already be saved from the earlier update step
           if (result.currentEntry) {
             const entry: LeagueEntry = {
-              leagueId: '',
+              leagueId: result.currentEntry.leagueId || '',
               queueType: 'RANKED_SOLO_5x5', // Explicitly set to solo queue
               tier: result.currentEntry.tier,
               rank: result.currentEntry.rank,
