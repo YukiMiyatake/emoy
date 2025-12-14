@@ -76,11 +76,18 @@ export async function POST(request: NextRequest) {
       losses: number;
     };
 
+    // Average LP changes per match (estimated)
+    // Note: Riot API doesn't provide actual LP gains/losses per match,
+    // so we use realistic average values based on typical League of Legends LP changes
+    // Typical range: 15-25 LP per match, with wins averaging slightly higher than losses
+    const AVERAGE_LP_GAIN_PER_WIN = 18;  // Average LP gained per win
+    const AVERAGE_LP_LOSS_PER_LOSS = 17; // Average LP lost per loss
+
     // Helper function to calculate LP change based on match result (working backwards)
     const calculateLPChange = (won: boolean): number => {
-      // Win: +20 LP gained, so before match = current - 20
-      // Loss: -20 LP lost, so before match = current + 20
-      return won ? -20 : 20;
+      // Win: +LP gained, so before match = current - LP gain
+      // Loss: -LP lost, so before match = current + LP loss
+      return won ? -AVERAGE_LP_GAIN_PER_WIN : AVERAGE_LP_LOSS_PER_LOSS;
     };
 
     // Helper function to create rate history entry from LP and stats
@@ -130,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     // Process matches in reverse chronological order (newest first)
     // We'll work backwards from current LP to estimate past LP
-    // N-1 LP = N LP - (N match result: Win = -20, Loose = +20)
+    // N-1 LP = N LP - (N match result: Win = -AVERAGE_LP_GAIN, Loss = +AVERAGE_LP_LOSS)
     for (const { match, matchId } of sortedMatchDetails) {
       // Find the player in the match
       const participant = match.info.participants.find((p: any) => p.puuid === puuid);
@@ -156,7 +163,7 @@ export async function POST(request: NextRequest) {
       );
 
       // Calculate LP before this match based on match result
-      // N-1 LP = N LP - (N match result: Win = -20, Loose = +20)
+      // N-1 LP = N LP - (N match result: Win = -AVERAGE_LP_GAIN, Loss = +AVERAGE_LP_LOSS)
       const lpChange = calculateLPChange(won);
       estimatedTotalLP += lpChange;
       estimatedTotalLP = Math.max(0, estimatedTotalLP);
