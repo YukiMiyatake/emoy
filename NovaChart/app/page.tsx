@@ -27,12 +27,18 @@ export default function Home() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    // Load initial data
-    loadRateHistory();
-    loadGoals();
-    loadMatches();
-    loadSkillGoals();
-    
+    const init = async () => {
+      // Migrate from legacy DBs once (old DBs are kept, not deleted)
+      const { runMigrationIfNeeded } = await import('@/lib/db');
+      await runMigrationIfNeeded();
+
+      // Load initial data
+      loadRateHistory();
+      loadGoals();
+      loadMatches();
+      loadSkillGoals();
+    };
+
     // Load saved summoner from database and fetch solo queue league entry
     const loadSavedSummoner = async () => {
       try {
@@ -108,8 +114,8 @@ export default function Home() {
         logger.error('[Home] Failed to load saved summoner:', error);
       }
     };
-    
-    loadSavedSummoner();
+
+    void init().then(() => loadSavedSummoner());
   }, [loadRateHistory, loadGoals, loadMatches, loadSkillGoals, setCurrentSummoner, setCurrentLeagueEntry]);
 
   useEffect(() => {
@@ -249,16 +255,16 @@ export default function Home() {
 
         if (rateHistoryResponse.ok) {
           const result = await rateHistoryResponse.json();
-          
+
           if (result.rateHistory && Array.isArray(result.rateHistory)) {
             const { rateHistoryService } = await import('@/lib/db');
             const { rateHistory: currentRateHistory } = useAppStore.getState();
-            
+
             // Get existing matchIds to avoid re-fetching and re-saving
             const existingMatchIds = new Set(
               currentRateHistory.map(r => r.matchId).filter((id): id is string => !!id)
             );
-            
+
             let successCount = 0;
             let failedCount = 0;
             let skippedCount = 0;
@@ -317,7 +323,7 @@ export default function Home() {
                 failedCount++;
               }
             }
-            
+
             logger.info(`[Update] Rate history updated: ${successCount} added/updated, ${failedCount} failed, ${skippedCount} skipped (${skippedCount - failedCount} already existed or missing matchId)`);
             
             // Save the latest entry from rateHistory (most recent match data from API)
@@ -342,6 +348,7 @@ export default function Home() {
                 }
               }
             }
+          } else {
           }
 
           // Update league entry for display
@@ -362,6 +369,27 @@ export default function Home() {
               hotStreak: false,
             };
             setCurrentLeagueEntry(entry); // This will validate it's solo queue
+          }
+        }
+        if (!rateHistoryResponse.ok) {
+          const errBody = await rateHistoryResponse.text();
+          if (rateHistoryResponse.status === 404) {
+            try {
+              const errJson = JSON.parse(errBody) as { error?: string };
+              if (errJson.error === 'No ranked solo queue entry found') {
+                const msg = 'ソロキューでランクがありません。LP履歴を表示するにはソロキューでランクを取得してください。';
+                setError(msg);
+                alert(msg);
+              } else {
+                const msg = errJson.error ?? 'レート履歴の取得に失敗しました';
+                setError(msg);
+                alert(msg);
+              }
+            } catch {
+              const msg = 'レート履歴の取得に失敗しました';
+              setError(msg);
+              alert(msg);
+            }
           }
         }
       } catch (error) {

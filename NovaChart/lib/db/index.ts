@@ -29,33 +29,147 @@ export class NovaChartDB extends Dexie {
   }
 }
 
-// Delete old databases to avoid version conflicts
-// This must run BEFORE creating the new database instance
-if (typeof window !== 'undefined' && 'indexedDB' in window) {
-  // Delete old database versions that might cause conflicts
-  const oldDbNames = ['NovaChartDB', 'NovaChartDB_v2', 'NovaChartDB_v3', 'NovaChartDB_v4', 'NovaChartDB_v5'];
-  
-  oldDbNames.forEach((dbName) => {
-    try {
-      const deleteReq = indexedDB.deleteDatabase(dbName);
-      deleteReq.onsuccess = () => {
-        console.log(`[NovaChartDB] Deleted old database: ${dbName}`);
-      };
-      deleteReq.onerror = () => {
-        console.warn(`[NovaChartDB] Failed to delete old database: ${dbName}`);
-      };
-      deleteReq.onblocked = () => {
-        console.warn(`[NovaChartDB] Database deletion blocked (may have open connections): ${dbName}`);
-      };
-    } catch (error) {
-      console.warn(`[NovaChartDB] Error deleting old database ${dbName}:`, error);
-    }
+/** Legacy DB names to migrate from. Old DBs are NOT deleted and are kept. */
+const LEGACY_DB_NAMES = ['NovaChartDB', 'NovaChartDB_v2', 'NovaChartDB_v3', 'NovaChartDB_v4', 'NovaChartDB_v5'];
+
+const MIGRATION_DONE_KEY = 'NovaChartDB_migration_v6_done';
+
+/** Normalize date field from IndexedDB (may be number or string) to Date. */
+function toDate(value: unknown): Date {
+  if (value instanceof Date) return value;
+  if (typeof value === 'number') return new Date(value);
+  if (typeof value === 'string') return new Date(value);
+  return new Date();
+}
+
+/**
+ * Migrate data from one legacy DB into the current db (v6).
+ * Does NOT delete the legacy DB.
+ */
+async function migrateFromLegacyDb(legacyDbName: string, targetDb: NovaChartDB): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(legacyDbName);
+    let totalMigrated = 0;
+
+    request.onerror = () => {
+      // DB does not exist or cannot be opened - not an error for us
+      resolve(0);
+    };
+
+    request.onsuccess = async () => {
+      const legacyDb = request.result;
+      const storeNames = Array.from(legacyDb.objectStoreNames) as string[];
+      const supportedStores = ['rateHistory', 'goals', 'matches', 'summoners', 'leagueEntries', 'skillGoals'];
+
+      try {
+        for (const storeName of storeNames) {
+          if (!supportedStores.includes(storeName)) continue;
+          const tx = legacyDb.transaction(storeName, 'readonly');
+          const store = tx.objectStore(storeName);
+          const getAllRequest = store.getAll();
+
+          const records = await new Promise<unknown[]>((res, rej) => {
+            getAllRequest.onsuccess = () => res(getAllRequest.result ?? []);
+            getAllRequest.onerror = () => rej(getAllRequest.error);
+          });
+
+          if (records.length === 0) continue;
+
+          const normalized = records.map((r: Record<string, unknown>) => {
+            const row = { ...r } as Record<string, unknown>;
+            if ('date' in row && row.date != null) row.date = toDate(row.date);
+            if ('createdAt' in row && row.createdAt != null) row.createdAt = toDate(row.createdAt);
+            if ('lastUpdated' in row && row.lastUpdated != null) row.lastUpdated = toDate(row.lastUpdated);
+            if ('targetDate' in row && row.targetDate != null) row.targetDate = toDate(row.targetDate);
+            return row;
+          });
+
+          try {
+            if (storeName === 'rateHistory') {
+              const existing = await targetDb.rateHistory.toArray();
+              const existingIds = new Set(existing.map((x) => x.matchId));
+              const toAdd = normalized.filter((r) => r.matchId && !existingIds.has(r.matchId as string)) as RateHistory[];
+              if (toAdd.length) await targetDb.rateHistory.bulkAdd(toAdd);
+              totalMigrated += toAdd.length;
+            } else if (storeName === 'matches') {
+              const existing = await targetDb.matches.toArray();
+              const existingIds = new Set(existing.map((x) => x.matchId));
+              const toAdd = normalized.filter((r) => r.matchId && !existingIds.has(r.matchId as string)) as Match[];
+              if (toAdd.length) await targetDb.matches.bulkAdd(toAdd);
+              totalMigrated += toAdd.length;
+            } else if (storeName === 'summoners') {
+              const existing = await targetDb.summoners.toArray();
+              const existingIds = new Set(existing.map((x) => x.puuid));
+              const toAdd = normalized.filter((r) => r.puuid && !existingIds.has(r.puuid as string)) as Summoner[];
+              if (toAdd.length) await targetDb.summoners.bulkAdd(toAdd);
+              totalMigrated += toAdd.length;
+            } else if (storeName === 'leagueEntries') {
+              const existing = await targetDb.leagueEntries.toArray();
+              const existingIds = new Set(existing.map((x) => x.leagueId));
+              const toAdd = normalized.filter((r) => {
+                const leagueId = (r.leagueId ?? r.puuid) as string;
+                return leagueId && !existingIds.has(leagueId);
+              }) as (LeagueEntry & { puuid: string; lastUpdated: Date })[];
+              for (const r of toAdd) {
+                if (!r.leagueId && r.puuid) (r as Record<string, unknown>).leagueId = `migrated-${r.puuid}`;
+              }
+              if (toAdd.length) await targetDb.leagueEntries.bulkPut(toAdd);
+              totalMigrated += toAdd.length;
+            } else if (storeName === 'goals') {
+              const toAdd = normalized.map((r) => {
+                const { id: _id, ...rest } = r as Goal & { id?: number };
+                return rest as Omit<Goal, 'id'>;
+              });
+              if (toAdd.length) await targetDb.goals.bulkAdd(toAdd as Goal[]);
+              totalMigrated += toAdd.length;
+            } else if (storeName === 'skillGoals') {
+              const toAdd = normalized.map((r) => {
+                const { id: _id, ...rest } = r as SkillGoal & { id?: number };
+                return rest as Omit<SkillGoal, 'id'>;
+              });
+              if (toAdd.length) await targetDb.skillGoals.bulkAdd(toAdd as SkillGoal[]);
+              totalMigrated += toAdd.length;
+            }
+          } catch (e) {
+            console.warn(`[NovaChartDB] Migration from ${legacyDbName} store ${storeName} failed:`, e);
+          }
+        }
+
+        legacyDb.close();
+        resolve(totalMigrated);
+      } catch (e) {
+        legacyDb.close();
+        reject(e);
+      }
+    };
   });
 }
 
+/**
+ * Run migration from all legacy DBs into v6 once.
+ * Old DBs are left intact (not deleted).
+ */
+export async function runMigrationIfNeeded(): Promise<void> {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return;
+  try {
+    const done = localStorage.getItem(MIGRATION_DONE_KEY);
+    if (done === 'true') return;
+
+    let total = 0;
+    for (const name of LEGACY_DB_NAMES) {
+      const count = await migrateFromLegacyDb(name, db);
+      if (count > 0) console.log(`[NovaChartDB] Migrated ${count} records from ${name}`);
+      total += count;
+    }
+
+    localStorage.setItem(MIGRATION_DONE_KEY, 'true');
+    if (total > 0) console.log(`[NovaChartDB] Migration done. Total records migrated: ${total}`);
+  } catch (e) {
+    console.warn('[NovaChartDB] Migration failed:', e);
+  }
+}
+
 // Create database instance
-// Note: Old database deletion happens asynchronously, but since we're using a new database name (v6),
-// there should be no conflict. If there are still issues, the user may need to manually clear IndexedDB.
 export const db = new NovaChartDB();
 
 // Helper functions for data operations

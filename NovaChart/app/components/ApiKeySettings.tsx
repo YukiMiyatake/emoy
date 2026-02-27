@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { STORAGE_KEYS, DEFAULTS } from '@/lib/constants';
 import { StorageService } from '@/lib/utils/storage';
+import { exportDbToFile, importDbFromFile } from '@/lib/db/exportImport';
 
 interface ApiKeySettingsProps {
   isExpanded?: boolean;
@@ -18,6 +19,10 @@ export default function ApiKeySettings({
   const [isSaved, setIsSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [internalExpanded, setInternalExpanded] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importMerge, setImportMerge] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use prop if provided, otherwise use internal state
   const isExpanded = isExpandedProp !== undefined ? isExpandedProp : internalExpanded;
@@ -49,6 +54,53 @@ export default function ApiKeySettings({
     StorageService.removeApiRegion();
     setApiKey('');
     setRegion(DEFAULTS.REGION);
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await exportDbToFile();
+      alert('データをエクスポートしました');
+    } catch (e) {
+      console.error('Export failed:', e);
+      alert('エクスポートに失敗しました');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const { imported, errors } = await importDbFromFile(file, { merge: importMerge });
+      const { useAppStore } = await import('@/lib/store/useAppStore');
+      useAppStore.getState().loadRateHistory();
+      useAppStore.getState().loadGoals();
+      useAppStore.getState().loadMatches();
+      useAppStore.getState().loadSkillGoals();
+      const summoners = await (await import('@/lib/db')).summonerService.getAll();
+      if (summoners.length > 0) {
+        const latest = summoners.sort((a, b) =>
+          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+        )[0];
+        useAppStore.getState().setCurrentSummoner(latest);
+        const entry = await (await import('@/lib/db')).leagueEntryService.getByPuuid(latest.puuid);
+        useAppStore.getState().setCurrentLeagueEntry(entry ?? null);
+      }
+      if (errors.length > 0) {
+        alert(`${imported} 件をインポートしました。一部エラー: ${errors.slice(0, 3).join('; ')}`);
+      } else {
+        alert(`${imported} 件をインポートしました`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'インポートに失敗しました';
+      alert(msg);
+    } finally {
+      setIsImporting(false);
+      e.target.value = '';
+    }
   };
 
   const handleDeleteAllData = async () => {
@@ -141,6 +193,44 @@ export default function ApiKeySettings({
           >
             クリア
           </button>
+        </div>
+
+        <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">データのエクスポート / インポート</p>
+          <div className="flex gap-2 mb-2">
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isExporting}
+              className="flex-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              {isExporting ? 'Export中...' : 'Export'}
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="flex-1 px-3 py-1.5 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
+            >
+              {isImporting ? 'Import中...' : 'Import'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleImport}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={importMerge}
+              onChange={(e) => setImportMerge(e.target.checked)}
+              className="rounded border-gray-300 dark:border-gray-600"
+            />
+            既存データにマージ（オフで上書き）
+          </label>
         </div>
 
         <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
